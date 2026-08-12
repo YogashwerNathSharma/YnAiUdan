@@ -31,6 +31,8 @@ model User {
   projects      ProjectMember[]
   conversations Conversation[]
   tasks         Task[]
+
+  @@index([tenantId])
 }
 
 model Project {
@@ -51,13 +53,15 @@ model Project {
 }
 
 model ProjectMember {
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
   projectId String      @db.ObjectId
   userId    String      @db.ObjectId
   role      ProjectRole @default(MEMBER)
   project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@id([projectId, userId])
+  @@unique([projectId, userId])
+  @@index([userId])
 }
 
 model Conversation {
@@ -88,21 +92,21 @@ model Message {
 }
 
 model Task {
-  id              String        @id @default(auto()) @map("_id") @db.ObjectId
-  tenantId        String        @db.ObjectId
-  userId          String        @db.ObjectId
-  projectId       String?       @db.ObjectId
+  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId        String       @db.ObjectId
+  userId          String       @db.ObjectId
+  projectId       String?      @db.ObjectId
   title           String
-  status          TaskStatus    @default(QUEUED)
-  autonomyMode    AutonomyMode  @default(ASK_BEFORE_TOOLS)
+  status          TaskStatus   @default(QUEUED)
+  autonomyMode    AutonomyMode @default(ASK_BEFORE_TOOLS)
   maxSteps        Int?
   maxToolCalls    Int?
   maxExecutionMs  Int?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project         Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  tenant          Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project         Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
   steps           TaskStep[]
 
   @@index([tenantId, status])
@@ -123,6 +127,7 @@ model TaskStep {
   task        Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, sequence])
+  @@index([taskId])
 }
 
 enum UserRole {
