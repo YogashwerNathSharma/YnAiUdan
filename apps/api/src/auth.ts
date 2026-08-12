@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "./db.js";
 
@@ -26,7 +27,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     if (existing) return reply.code(409).send({ error: "Email already registered" });
 
     const baseSlug = input.tenantName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "tenant";
-    const slug = `${baseSlug}-${crypto.randomUUID().slice(0, 8)}`;
+    const slug = `${baseSlug}-${randomUUID().slice(0, 8)}`;
     const passwordHash = await bcrypt.hash(input.password, 12);
 
     const created = await db.$transaction(async (tx) => {
