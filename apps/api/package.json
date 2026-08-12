@@ -16,6 +16,7 @@
     "@prisma/client": "latest",
     "bcryptjs": "latest",
     "fastify": "latest",
+    "openai": "latest",
     "zod": "latest"
   },
   "devDependencies": {
