@@ -1,40 +1,70 @@
-import React from "react";
+import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-function App() {
-  return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">YnAiUdan</div>
-        <button className="new-chat">+ New chat</button>
-        <nav>
-          <a href="#conversations">Conversations</a>
-          <a href="#projects">Projects</a>
-          <a href="#tasks">Tasks</a>
-          <a href="#files">Files</a>
-          <a href="#integrations">Integrations</a>
-          <a href="#settings">Settings</a>
-        </nav>
-      </aside>
-      <main className="chat-area">
-        <header>
-          <span>YnAiUdan</span>
-          <span className="status">Phase 1 foundation</span>
-        </header>
-        <section className="welcome">
-          <h1>What can I help you build?</h1>
-          <p>Chat, code, research, create, analyze, and execute authorized tasks.</p>
-        </section>
-        <div className="composer">
-          <textarea placeholder="Message YnAiUdan..." rows={3} />
-          <button>Send</button>
-        </div>
-      </main>
-    </div>
-  );
+type User = { id: string; email: string; displayName: string; role: string; tenantId: string };
+type Project = { id: string; name: string; slug: string; instructions?: string | null };
+type Conversation = { id: string; title: string; projectId?: string | null; updatedAt: string };
+type Message = { id: string; role: string; content: string; createdAt: string };
+
+const API = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+
+async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = localStorage.getItem("ynaiudan_token");
+  const response = await fetch(`${API}${path}`, {
+    ...options,
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers }
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error ?? "Request failed");
+  return body as T;
 }
 
-createRoot(document.getElementById("root")!).render(
-  <React.StrictMode><App /></React.StrictMode>
-);
+function AuthScreen({ onLogin }: { onLogin: (user: User, token: string) => void }) {
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [name, setName] = useState("");
+  const [tenantName, setTenantName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setBusy(true); setError("");
+    try {
+      const data = await api<{ user: User; token: string }>(`/api/v1/auth/${mode}`, {
+        method: "POST", body: JSON.stringify(mode === "login" ? { email, password } : { name, tenantName, email, password })
+      });
+      localStorage.setItem("ynaiudan_token", data.token); onLogin(data.user, data.token);
+    } catch (e) { setError(e instanceof Error ? e.message : "Authentication failed"); }
+    finally { setBusy(false); }
+  }
+
+  return <main className="auth-shell"><form className="auth-card" onSubmit={submit}>
+    <div className="brand">YnAiUdan</div><h1>{mode === "login" ? "Welcome back" : "Create your workspace"}</h1>
+    {mode === "register" && <><label>Name<input value={name} onChange={e => setName(e.target.value)} required /></label><label>Workspace name<input value={tenantName} onChange={e => setTenantName(e.target.value)} required /></label></>}
+    <label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required /></label>
+    <label>Password<input type="password" minLength={mode === "register" ? 12 : 1} value={password} onChange={e => setPassword(e.target.value)} required /></label>
+    {error && <div className="error">{error}</div>}<button className="primary" disabled={busy}>{busy ? "Working…" : mode === "login" ? "Sign in" : "Create account"}</button>
+    <button type="button" className="link-button" onClick={() => setMode(mode === "login" ? "register" : "login")}>{mode === "login" ? "Create an account" : "Already have an account? Sign in"}</button>
+  </form></main>;
+}
+
+function App({ user, onLogout }: { user: User; onLogout: () => void }) {
+  const [projects, setProjects] = useState<Project[]>([]); const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversationId, setConversationId] = useState<string>(); const [messages, setMessages] = useState<Message[]>([]); const [input, setInput] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const activeConversation = useMemo(() => conversations.find(c => c.id === conversationId), [conversations, conversationId]);
+
+  useEffect(() => { Promise.all([api<Project[]>("/api/v1/projects"), api<Conversation[]>("/api/v1/conversations")]).then(([p, c]) => { setProjects(p); setConversations(c); }).catch(e => setError(e.message)); }, []);
+
+  async function newConversation() { const c = await api<Conversation>("/api/v1/conversations", { method: "POST", body: JSON.stringify({}) }); setConversations([c, ...conversations]); setConversationId(c.id); setMessages([]); }
+  async function openConversation(id: string) { const c = await api<Conversation & { messages: Message[] }>(`/api/v1/conversations/${id}`); setConversationId(id); setMessages(c.messages); }
+  async function send(event: FormEvent) { event.preventDefault(); if (!input.trim()) return; setBusy(true); setError(""); try { let id = conversationId; if (!id) { const c = await api<Conversation>("/api/v1/conversations", { method: "POST", body: JSON.stringify({}) }); id = c.id; setConversationId(id); setConversations([c, ...conversations]); } const text = input.trim(); setInput(""); const data = await api<{ message: Message; assistant: string }>(`/api/v1/conversations/${id}/messages`, { method: "POST", body: JSON.stringify({ content: text }) }); setMessages(prev => [...prev, data.message]); } catch (e) { setError(e instanceof Error ? e.message : "Unable to send message"); } finally { setBusy(false); } }
+
+  return <div className="app-shell"><aside className="sidebar"><div className="brand">YnAiUdan</div><button className="new-chat" onClick={newConversation}>+ New chat</button><div className="side-section"><span>Projects</span>{projects.map(p => <div className="side-item" key={p.id}>{p.name}</div>)}</div><div className="side-section"><span>Conversations</span>{conversations.slice(0, 20).map(c => <button className={`side-item conversation ${c.id === conversationId ? "active" : ""}`} key={c.id} onClick={() => openConversation(c.id)}>{c.title}</button>)}</div><button className="logout" onClick={onLogout}>Sign out</button></aside>
+    <main className="chat-area"><header><span>{activeConversation?.title ?? "YnAiUdan"}</span><span className="user-pill">{user.displayName}</span></header><section className="messages">{messages.length === 0 ? <div className="welcome"><h1>What can I help you build?</h1><p>Chat, code, research, create, analyze, and execute authorized tasks.</p></div> : messages.map(m => <article className={`message ${m.role.toLowerCase()}`} key={m.id}><strong>{m.role === "USER" ? user.displayName : "YnAiUdan"}</strong><div>{m.content}</div></article>)}{busy && <div className="typing">Saving your message…</div>}</section>{error && <div className="inline-error">{error}</div>}<form className="composer" onSubmit={send}><textarea value={input} onChange={e => setInput(e.target.value)} placeholder="Message YnAiUdan…" rows={3} disabled={busy} /><button disabled={busy || !input.trim()}>Send</button></form></main></div>;
+}
+
+function Root() { const [user, setUser] = useState<User | null>(null); useEffect(() => { api<{ user: User }>("/api/v1/auth/me").then(r => setUser(r.user)).catch(() => localStorage.removeItem("ynaiudan_token")); }, []); if (!user) return <AuthScreen onLogin={u => setUser(u)} />; return <App user={user} onLogout={() => { localStorage.removeItem("ynaiudan_token"); setUser(null); }} />; }
+
+createRoot(document.getElementById("root")!).render(<React.StrictMode><Root /></React.StrictMode>);
