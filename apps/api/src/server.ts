@@ -20,6 +20,7 @@ import { registerGitHubCodingAgentRoutes } from "./github-coding-agent.js";
 import { registerGitHubExecutionRoutes } from "./github-execution.js";
 import { registerGitHubCodingTools } from "./github-tools.js";
 import { registerResearchRoutes, registerResearchTools } from "./research.js";
+import { registerContextRoutes } from "./context.js";
 import { GitHubHttpClient } from "./github-client.js";
 import { toolRegistry } from "./tools.js";
 import { db } from "./db.js";
@@ -36,6 +37,6 @@ app.get("/health", async () => ({ status: "ok", service: "ynaiudan-api", version
 app.get("/health/database", async (_request, reply) => { try { await db.$runCommandRaw({ ping: 1 }); return { status: "ok", service: "mongodb" }; } catch { return reply.code(503).send({ status: "unavailable", service: "mongodb" }); } });
 app.get("/api/v1", async () => ({ name: "YnAiUdan API", version: "v1" }));
 app.get("/api/v1/tools", async () => toolRegistry.list());
-await registerAuthRoutes(app); await registerProjectRoutes(app); await registerConversationRoutes(app); await registerChatRoutes(app); await registerChatStreamRoutes(app); await registerAgentRoutes(app); await registerPermissionRoutes(app); await registerWorkspaceRoutes(app); await registerCodingRoutes(app); await registerCodeAgentRoutes(app); await registerGitHubAgentRoutes(app); await registerGitHubWriteRoutes(app); await registerGitHubActionRoutes(app); await registerGitHubCodingAgentRoutes(app); await registerGitHubExecutionRoutes(app); await registerResearchRoutes(app);
+await registerAuthRoutes(app); await registerProjectRoutes(app); await registerConversationRoutes(app); await registerChatRoutes(app); await registerChatStreamRoutes(app); await registerAgentRoutes(app); await registerPermissionRoutes(app); await registerWorkspaceRoutes(app); await registerCodingRoutes(app); await registerCodeAgentRoutes(app); await registerGitHubAgentRoutes(app); await registerGitHubWriteRoutes(app); await registerGitHubActionRoutes(app); await registerGitHubCodingAgentRoutes(app); await registerGitHubExecutionRoutes(app); await registerResearchRoutes(app); await registerContextRoutes(app);
 const port = Number(process.env.PORT ?? 4000); const host = process.env.HOST ?? "0.0.0.0";
 try { await app.listen({ port, host }); } catch (error) { app.log.error(error); await db.$disconnect(); process.exit(1); }
