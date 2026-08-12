@@ -1,0 +1,21 @@
+:root { font-family: Inter, system-ui, sans-serif; color: #e8eaf0; background: #0b0d12; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button, textarea { font: inherit; }
+.app-shell { min-height: 100vh; display: flex; background: #0b0d12; }
+.sidebar { width: 250px; padding: 20px; border-right: 1px solid #252936; background: #10131a; }
+.brand { font-size: 22px; font-weight: 700; margin-bottom: 24px; }
+.new-chat { width: 100%; padding: 11px; border: 1px solid #303545; border-radius: 10px; background: #171b24; color: inherit; cursor: pointer; }
+nav { display: grid; gap: 8px; margin-top: 24px; }
+nav a { color: #aeb5c5; text-decoration: none; padding: 9px 10px; border-radius: 8px; }
+nav a:hover { background: #191d27; color: #fff; }
+.chat-area { flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+header { height: 60px; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #252936; font-weight: 600; }
+.status { color: #8d95a8; font-size: 13px; font-weight: 400; }
+.welcome { flex: 1; display: grid; place-content: center; text-align: center; padding: 32px; }
+.welcome h1 { margin: 0 0 10px; font-size: clamp(28px, 5vw, 48px); }
+.welcome p { color: #8d95a8; }
+.composer { margin: 0 auto 28px; width: min(800px, calc(100% - 32px)); display: flex; gap: 10px; padding: 10px; border: 1px solid #303545; border-radius: 14px; background: #11151d; }
+textarea { flex: 1; resize: none; border: 0; outline: 0; background: transparent; color: inherit; padding: 8px; }
+.composer button { align-self: flex-end; border: 0; border-radius: 9px; padding: 9px 16px; background: #fff; color: #111; cursor: pointer; }
+@media (max-width: 720px) { .sidebar { display: none; } }
