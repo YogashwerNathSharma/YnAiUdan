@@ -16,6 +16,7 @@ model Tenant {
   users     User[]
   projects  Project[]
   tasks     Task[]
+  memories  Memory[]
 }
 
 model User {
@@ -31,6 +32,7 @@ model User {
   projects      ProjectMember[]
   conversations Conversation[]
   tasks         Task[]
+  memories      Memory[]
 
   @@index([tenantId])
 }
@@ -47,6 +49,7 @@ model Project {
   members       ProjectMember[]
   conversations Conversation[]
   tasks         Task[]
+  memories      Memory[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
@@ -89,6 +92,26 @@ model Message {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
+}
+
+model Memory {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId    String      @db.ObjectId
+  userId      String      @db.ObjectId
+  projectId   String?     @db.ObjectId
+  type        MemoryType
+  key         String
+  value       String
+  importance  Float       @default(0.5)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, userId, updatedAt])
+  @@index([projectId, importance, updatedAt])
+  @@index([type, updatedAt])
 }
 
 model Task {
@@ -150,6 +173,15 @@ enum MessageRole {
   ASSISTANT
   SYSTEM
   TOOL
+}
+
+enum MemoryType {
+  CONVERSATION
+  USER
+  PROJECT
+  TASK
+  TOOL
+  PREFERENCE
 }
 
 enum TaskStatus {
