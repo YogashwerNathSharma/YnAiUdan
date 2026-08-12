@@ -8,6 +8,9 @@
     "dev": "pnpm --parallel --filter @ynaiudan/web --filter @ynaiudan/api dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @ynaiudan/api exec prisma generate",
+    "db:format": "pnpm --filter @ynaiudan/api exec prisma format",
+    "db:migrate": "pnpm --filter @ynaiudan/api exec prisma migrate dev"
   }
 }
