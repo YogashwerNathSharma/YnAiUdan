@@ -24,23 +24,13 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
     if (!conversation) return reply.code(404).send({ error: "Conversation not found" });
 
     await db.message.create({ data: { conversationId: conversation.id, role: "USER", content: input.message } });
-
-    const history: AIChatMessage[] = conversation.messages.map(message => ({
-      role: message.role.toLowerCase() as AIChatMessage["role"],
-      content: message.content
-    }));
+    const history: AIChatMessage[] = conversation.messages.map(message => ({ role: message.role.toLowerCase() as AIChatMessage["role"], content: message.content }));
     history.push({ role: "user", content: input.message });
 
     const provider = resolveProvider(input.model);
     const result = await provider.chat({ model: input.model, messages: history });
-    const assistant = await db.message.create({
-      data: { conversationId: conversation.id, role: "ASSISTANT", content: result.content, model: result.model }
-    });
+    const assistant = await db.message.create({ data: { conversationId: conversation.id, role: "ASSISTANT", content: result.content, model: result.model } });
 
-    return reply.send({
-      message: { id: assistant.id, role: assistant.role, content: assistant.content, createdAt: assistant.createdAt },
-      provider: provider.name,
-      model: result.model
-    });
+    return reply.send({ message: { id: assistant.id, role: assistant.role, content: assistant.content, createdAt: assistant.createdAt }, provider: provider.name, model: result.model });
   });
 }
