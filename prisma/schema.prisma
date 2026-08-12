@@ -3,12 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model Tenant {
-  id        String    @id @default(cuid())
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
   name      String
   slug      String    @unique
   createdAt DateTime  @default(now())
@@ -19,56 +19,56 @@ model Tenant {
 }
 
 model User {
-  id           String         @id @default(cuid())
-  tenantId     String
-  email        String         @unique
-  passwordHash String
-  displayName  String
-  role         UserRole       @default(USER)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  projects     ProjectMember[]
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId      String          @db.ObjectId
+  email         String          @unique
+  passwordHash  String
+  displayName   String
+  role          UserRole        @default(USER)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects      ProjectMember[]
   conversations Conversation[]
-  tasks        Task[]
+  tasks         Task[]
 }
 
 model Project {
-  id           String          @id @default(cuid())
-  tenantId     String
-  name         String
-  slug         String
-  instructions String?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  members      ProjectMember[]
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId      String          @db.ObjectId
+  name          String
+  slug          String
+  instructions  String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  members       ProjectMember[]
   conversations Conversation[]
-  tasks        Task[]
+  tasks         Task[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
 }
 
 model ProjectMember {
-  projectId String
-  userId    String
+  projectId String      @db.ObjectId
+  userId    String      @db.ObjectId
   role      ProjectRole @default(MEMBER)
-  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([projectId, userId])
 }
 
 model Conversation {
-  id        String    @id @default(cuid())
-  projectId String?
-  userId    String
-  title     String    @default("New conversation")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String       @id @default(auto()) @map("_id") @db.ObjectId
+  projectId String?      @db.ObjectId
+  userId    String       @db.ObjectId
+  title     String       @default("New conversation")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  project   Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  Message[]
 
   @@index([userId, updatedAt])
@@ -76,33 +76,33 @@ model Conversation {
 }
 
 model Message {
-  id             String      @id @default(cuid())
-  conversationId String
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String       @db.ObjectId
   role           MessageRole
   content        String
   model          String?
-  createdAt      DateTime    @default(now())
+  createdAt      DateTime     @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
 }
 
 model Task {
-  id              String     @id @default(cuid())
-  tenantId        String
-  userId          String
-  projectId       String?
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId        String        @db.ObjectId
+  userId          String        @db.ObjectId
+  projectId       String?       @db.ObjectId
   title           String
-  status          TaskStatus @default(QUEUED)
-  autonomyMode    AutonomyMode @default(ASK_BEFORE_TOOLS)
-  maxSteps       Int?
-  maxToolCalls   Int?
-  maxExecutionMs Int?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  tenant          Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project         Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  status          TaskStatus    @default(QUEUED)
+  autonomyMode    AutonomyMode  @default(ASK_BEFORE_TOOLS)
+  maxSteps        Int?
+  maxToolCalls    Int?
+  maxExecutionMs  Int?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project         Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
   steps           TaskStep[]
 
   @@index([tenantId, status])
@@ -110,8 +110,8 @@ model Task {
 }
 
 model TaskStep {
-  id          String     @id @default(cuid())
-  taskId      String
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  taskId      String     @db.ObjectId
   sequence    Int
   name        String
   status      StepStatus @default(PENDING)
