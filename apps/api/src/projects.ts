@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "./db.js";
 import { authenticate } from "./auth.js";
@@ -24,7 +25,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     const auth = request.user as AuthPayload;
     const input = projectSchema.parse(request.body);
     const slugBase = input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";
-    const slug = `${slugBase}-${crypto.randomUUID().slice(0, 8)}`;
+    const slug = `${slugBase}-${randomUUID().slice(0, 8)}`;
 
     const project = await db.project.create({
       data: {
