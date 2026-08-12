@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import jwt from "@fastify/jwt";
 import { registerAuthRoutes } from "./auth.js";
+import { registerProjectRoutes } from "./projects.js";
 import { db } from "./db.js";
 
 const app = Fastify({ logger: true });
@@ -40,6 +41,7 @@ app.get("/api/v1", async () => ({
 }));
 
 await registerAuthRoutes(app);
+await registerProjectRoutes(app);
 
 const port = Number(process.env.PORT ?? 4000);
 const host = process.env.HOST ?? "0.0.0.0";
