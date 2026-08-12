@@ -32,7 +32,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         tenantId: auth.tenantId,
         name: input.name,
         slug,
-        instructions: input.instructions,
+        ...(input.instructions === undefined ? {} : { instructions: input.instructions }),
         members: { create: { userId: auth.sub, role: "OWNER" } }
       },
       select: { id: true, name: true, slug: true, instructions: true, createdAt: true, updatedAt: true }
