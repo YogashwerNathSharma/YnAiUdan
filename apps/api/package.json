@@ -13,14 +13,14 @@
     "@fastify/cors": "latest",
     "@fastify/helmet": "latest",
     "@fastify/jwt": "latest",
-    "@prisma/client": "latest",
+    "@prisma/client": "6.19.3",
     "bcryptjs": "latest",
     "fastify": "latest",
     "openai": "latest",
     "zod": "latest"
   },
   "devDependencies": {
-    "prisma": "latest",
+    "prisma": "6.19.3",
     "tsx": "latest",
     "typescript": "latest"
   }
