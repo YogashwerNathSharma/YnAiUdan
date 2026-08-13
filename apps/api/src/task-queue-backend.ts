@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { MongoTaskQueueBackend } from "./task-queue-persistence.js";
 
 export type QueueJob = { id: string; taskId: string; createdAt: number; attempts: number };
 
@@ -21,5 +22,5 @@ export class MemoryQueueBackend implements TaskQueueBackend {
 }
 
 export function createQueueBackend(): TaskQueueBackend {
-  return new MemoryQueueBackend();
+  return process.env.QUEUE_BACKEND === "memory" ? new MemoryQueueBackend() : new MongoTaskQueueBackend();
 }
