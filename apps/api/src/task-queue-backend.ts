@@ -5,6 +5,9 @@ export type QueueJob = { id: string; taskId: string; createdAt: number; attempts
 export interface TaskQueueBackend {
   enqueue(taskId: string): Promise<QueueJob>;
   dequeue(): Promise<QueueJob | null>;
+  complete?(jobId: string): Promise<void>;
+  fail?(jobId: string, error: string): Promise<void>;
+  recoverStale?(maxAgeMs: number): Promise<number>;
   size(): Promise<number>;
   clear(): Promise<void>;
 }
@@ -18,6 +21,5 @@ export class MemoryQueueBackend implements TaskQueueBackend {
 }
 
 export function createQueueBackend(): TaskQueueBackend {
-  // Persistent Redis/BullMQ can implement this interface later without changing the agent API.
   return new MemoryQueueBackend();
 }
