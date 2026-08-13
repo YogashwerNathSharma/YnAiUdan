@@ -23,6 +23,7 @@ import { registerResearchRoutes, registerResearchTools } from "./research.js";
 import { registerContextRoutes } from "./context.js";
 import { GitHubHttpClient } from "./github-client.js";
 import { toolRegistry } from "./tools.js";
+import { modelRouterInfo } from "./model-router.js";
 import { db } from "./db.js";
 import { taskQueue } from "./task-queue.js";
 import { processTaskQueueItem } from "./task-worker.js";
@@ -40,6 +41,7 @@ app.get("/health", async () => ({ status: "ok", service: "ynaiudan-api", version
 app.get("/health/database", async (_request, reply) => { try { await db.$runCommandRaw({ ping: 1 }); return { status: "ok", service: "mongodb" }; } catch { return reply.code(503).send({ status: "unavailable", service: "mongodb" }); } });
 app.get("/api/v1", async () => ({ name: "YnAiUdan API", version: "v1" }));
 app.get("/api/v1/tools", async () => toolRegistry.list());
+app.get("/api/v1/models", async () => modelRouterInfo());
 await registerAuthRoutes(app); await registerProjectRoutes(app); await registerConversationRoutes(app); await registerChatRoutes(app); await registerChatStreamRoutes(app); await registerAgentRoutes(app); await registerPermissionRoutes(app); await registerWorkspaceRoutes(app); await registerCodingRoutes(app); await registerCodeAgentRoutes(app); await registerGitHubAgentRoutes(app); await registerGitHubWriteRoutes(app); await registerGitHubActionRoutes(app); await registerGitHubCodingAgentRoutes(app); await registerGitHubExecutionRoutes(app); await registerResearchRoutes(app); await registerContextRoutes(app);
 startQueueRecovery();
 void taskQueue.start(processTaskQueueItem);
