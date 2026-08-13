@@ -1,12 +1,11 @@
 import { db } from "./db.js";
 import type { QueueJob, TaskQueueBackend } from "./task-queue-backend.js";
 
-/** Durable MongoDB-backed queue. Use QUEUE_BACKEND=mongo until Redis/BullMQ is provisioned. */
 export class MongoTaskQueueBackend implements TaskQueueBackend {
   async enqueue(taskId: string): Promise<QueueJob> {
     const task = await db.task.findUnique({ where: { id: taskId }, select: { id: true } });
     if (!task) throw new Error("Task not found");
-    const job = await db.taskQueueJob.create({ data: { taskId, status: "QUEUED", attempts: 0 } });
+    const job = await db.taskQueueJob.create({ data: { taskId, tenantId: (await db.task.findUniqueOrThrow({ where: { id: taskId }, select: { tenantId: true } })).tenantId, status: "QUEUED", attempts: 0 } });
     return { id: job.id, taskId: job.taskId, createdAt: job.createdAt.getTime(), attempts: job.attempts };
   }
 
@@ -18,6 +17,8 @@ export class MongoTaskQueueBackend implements TaskQueueBackend {
     return { id: job.id, taskId: job.taskId, createdAt: job.createdAt.getTime(), attempts: job.attempts + 1 };
   }
 
+  async complete(jobId: string): Promise<void> { await db.taskQueueJob.updateMany({ where: { id: jobId, status: "RUNNING" }, data: { status: "COMPLETED", finishedAt: new Date(), error: null } }); }
+  async fail(jobId: string, error: string): Promise<void> { await db.taskQueueJob.updateMany({ where: { id: jobId, status: "RUNNING" }, data: { status: "FAILED", finishedAt: new Date(), error: error.slice(0, 4000) } }); }
   async size(): Promise<number> { return db.taskQueueJob.count({ where: { status: "QUEUED" } }); }
   async clear(): Promise<void> { await db.taskQueueJob.deleteMany({ where: { status: "QUEUED" } }); }
 }
