@@ -16,9 +16,7 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
     const task = await db.task.create({ data: { tenantId: auth.tenantId, userId: auth.sub, projectId: input.projectId, title: input.title, goal: input.goal, status: "PLANNING", maxSteps: input.maxSteps, maxToolCalls: input.maxToolCalls, maxRetries: input.maxRetries, steps: { create: { sequence: 1, name: "PLAN", status: "RUNNING", input: { goal: input.goal } } } }, include: { steps: true } });
     return reply.code(201).send(task);
   });
-
   app.get("/api/v1/agents/tasks", { preHandler: authenticate }, async request => { const auth = request.user as AuthPayload; return db.task.findMany({ where: { tenantId: auth.tenantId, userId: auth.sub }, orderBy: { createdAt: "desc" }, take: 100 }); });
-
   app.post("/api/v1/agents/tasks/:id/plan", { preHandler: authenticate }, async (request, reply) => {
     const auth = request.user as AuthPayload; const { id } = request.params as { id: string }; const task = await db.task.findFirst({ where: { id, tenantId: auth.tenantId, userId: auth.sub }, include: { steps: { orderBy: { sequence: "asc" } } } });
     if (!task) return reply.code(404).send({ error: "Task not found" });
@@ -27,9 +25,7 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
     await db.taskStep.deleteMany({ where: { taskId: task.id } }); await db.taskStep.createMany({ data: lines.map((line, index) => ({ taskId: task.id, sequence: index + 1, name: "PLAN", status: "PENDING" as const, input: { instruction: line } })) });
     const updated = await db.task.update({ where: { id: task.id }, data: { status: "WAITING_APPROVAL" }, include: { steps: { orderBy: { sequence: "asc" } } } }); return reply.send({ task: updated, planner: provider.name });
   });
-
   app.post("/api/v1/agents/tasks/:id/approve", { preHandler: authenticate }, async (request, reply) => { const auth = request.user as AuthPayload; const { id } = request.params as { id: string }; const task = await db.task.findFirst({ where: { id, tenantId: auth.tenantId, userId: auth.sub } }); if (!task) return reply.code(404).send({ error: "Task not found" }); const updated = await db.task.update({ where: { id }, data: { status: "RUNNING" } }); return reply.send({ task: updated, execution: "ready" }); });
-
-  app.post("/api/v1/agents/tasks/:id/execute-next", { preHandler: authenticate }, async (request, reply) => { const auth = request.user as AuthPayload; const { id } = request.params as { id: string }; try { return reply.send(await executeNextTaskStep(id, auth.sub, auth.tenantId)); } catch (error) { return reply.code(400).send({ error: error instanceof Error ? error.message : "Task execution failed" }); } });
+  app.post("/api/v1/agents/tasks/:id/execute-next", { preHandler: authenticate }, async (request, reply) => { const auth = request.user as AuthPayload; const { id } = request.params as { id: string }; try { return reply.send(await executeNextTaskStep(id, auth.sub, auth.tenantId, auth.role)); } catch (error) { return reply.code(400).send({ error: error instanceof Error ? error.message : "Task execution failed" }); } });
 }
 export const taskExecutionId = (): string => randomUUID();
