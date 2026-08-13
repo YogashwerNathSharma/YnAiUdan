@@ -17,12 +17,13 @@ model Tenant {
   projects  Project[]
   tasks     Task[]
   memories  Memory[]
+  queueJobs TaskQueueJob[]
 }
 
 model User {
   id            String          @id @default(auto()) @map("_id") @db.ObjectId
   tenantId      String          @db.ObjectId
-  email         String          @unique
+  email         String           @unique
   passwordHash  String
   displayName   String
   role          UserRole        @default(USER)
@@ -134,6 +135,7 @@ model Task {
   user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   project         Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
   steps           TaskStep[]
+  queueJobs       TaskQueueJob[]
 
   @@index([tenantId, status])
   @@index([userId, createdAt])
@@ -150,6 +152,7 @@ model TaskStep {
   input       Json?
   output      Json?
   error       String?
+  retryCount  Int         @default(0)
   startedAt   DateTime?
   completedAt DateTime?
   task        Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -157,68 +160,30 @@ model TaskStep {
   @@index([taskId])
 }
 
-enum UserRole {
-  OWNER
-  ADMIN
-  DEVELOPER
-  USER
-  AGENT
+model TaskQueueJob {
+  id        String        @id @default(auto()) @map("_id") @db.ObjectId
+  taskId    String        @db.ObjectId
+  status    QueueJobStatus @default(QUEUED)
+  attempts  Int           @default(0)
+  createdAt DateTime      @default(now())
+  startedAt DateTime?
+  finishedAt DateTime?
+  error     String?
+  tenantId  String        @db.ObjectId
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  task      Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([tenantId, status])
+  @@index([taskId])
 }
 
-enum ProjectRole {
-  OWNER
-  EDITOR
-  MEMBER
-  VIEWER
-}
-
-enum MessageRole {
-  USER
-  ASSISTANT
-  SYSTEM
-  TOOL
-}
-
-enum MemoryType {
-  CONVERSATION
-  USER
-  PROJECT
-  TASK
-  TOOL
-  PREFERENCE
-}
-
-enum TaskStatus {
-  QUEUED
-  PLANNING
-  RUNNING
-  WAITING_APPROVAL
-  PAUSED
-  FAILED
-  COMPLETED
-  CANCELLED
-}
-
-enum StepStatus {
-  PENDING
-  RUNNING
-  COMPLETED
-  FAILED
-  SKIPPED
-}
-
-enum TaskStepType {
-  PLAN
-  TOOL
-  VALIDATION
-  RESULT
-}
-
-enum AutonomyMode {
-  CHAT_ONLY
-  SUGGEST_ACTIONS
-  ASK_BEFORE_TOOLS
-  AUTO_SAFE
-  AUTONOMOUS
-  FULLY_CONTROLLED
-}
+enum UserRole { OWNER ADMIN DEVELOPER USER AGENT }
+enum ProjectRole { OWNER EDITOR MEMBER VIEWER }
+enum MessageRole { USER ASSISTANT SYSTEM TOOL }
+enum MemoryType { CONVERSATION USER PROJECT TASK TOOL PREFERENCE }
+enum TaskStatus { QUEUED PLANNING RUNNING WAITING_APPROVAL PAUSED FAILED COMPLETED CANCELLED }
+enum StepStatus { PENDING RUNNING COMPLETED FAILED SKIPPED }
+enum TaskStepType { PLAN TOOL VALIDATION RESULT }
+enum AutonomyMode { CHAT_ONLY SUGGEST_ACTIONS ASK_BEFORE_TOOLS AUTO_SAFE AUTONOMOUS FULLY_CONTROLLED }
+enum QueueJobStatus { QUEUED RUNNING COMPLETED FAILED }
