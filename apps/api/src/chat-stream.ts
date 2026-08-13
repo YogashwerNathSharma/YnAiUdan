@@ -4,9 +4,11 @@ import { db } from "./db.js";
 import { authenticate } from "./auth.js";
 import { executeModelStream } from "./model-stream-execution.js";
 import { resolveChatContext } from "./context-resolver.js";
+import { recordAIUsage } from "./ai-usage.js";
 
 type AuthPayload = { sub: string; tenantId: string };
 const schema = z.object({ conversationId: z.string().regex(/^[a-f0-9]{24}$/i), model: z.string().trim().min(1).max(100).optional(), message: z.string().trim().min(1).max(100_000) });
+const providerFromModel = (model: string) => model.includes(":") ? model.split(":", 1)[0] : "openai";
 
 export async function registerChatStreamRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/v1/chat/stream", { preHandler: authenticate }, async (request, reply) => {
@@ -17,15 +19,18 @@ export async function registerChatStreamRoutes(app: FastifyInstance): Promise<vo
     const context = await resolveChatContext({ conversationId: conversation.id, userId: auth.sub, tenantId: auth.tenantId });
     const messages = [{ role: "system" as const, content: `You are YnAiUdan. Use supplied project, memory, task and conversation context. Never claim a tool was used without a tool result.\n\n${context.systemContext}` }, { role: "user" as const, content: input.message }];
     reply.raw.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
-    let final = ""; let providerModel = input.model;
+    let final = ""; let providerModel = input.model ?? "router"; let usage: { inputTokens?: number; outputTokens?: number } | undefined; const startedAt = Date.now();
     try {
       for await (const event of executeModelStream({ task: "chat", requestedModel: input.model, messages })) {
         if (event.type === "text") { final += event.text ?? ""; reply.raw.write(`data: ${JSON.stringify({ type: "text", text: event.text ?? "" })}\n\n`); }
-        if (event.type === "done" && event.response) { providerModel = event.response.model; }
+        if (event.type === "done" && event.response) { providerModel = event.response.model; usage = event.response.usage; }
       }
+      await recordAIUsage({ tenantId: auth.tenantId, userId: auth.sub, taskType: "chat_stream", provider: providerFromModel(providerModel), model: providerModel, inputTokens: usage?.inputTokens, outputTokens: usage?.outputTokens, latencyMs: Date.now() - startedAt, success: true });
       const assistant = await db.message.create({ data: { conversationId: conversation.id, role: "ASSISTANT", content: final, model: providerModel } });
       reply.raw.write(`data: ${JSON.stringify({ type: "done", messageId: assistant.id, model: providerModel, context: { characters: context.characters, truncated: context.truncated, memories: context.selectedMemoryIds.length } })}\n\n`);
-    } catch (error) { reply.raw.write(`data: ${JSON.stringify({ type: "error", error: error instanceof Error ? error.message : "Streaming request failed" })}\n\n`); }
-    finally { reply.raw.end(); }
+    } catch (error) {
+      await recordAIUsage({ tenantId: auth.tenantId, userId: auth.sub, taskType: "chat_stream", provider: providerFromModel(providerModel), model: providerModel, latencyMs: Date.now() - startedAt, success: false, error: error instanceof Error ? error.message : "Streaming request failed" });
+      reply.raw.write(`data: ${JSON.stringify({ type: "error", error: error instanceof Error ? error.message : "Streaming request failed" })}\n\n`);
+    } finally { reply.raw.end(); }
   });
 }
