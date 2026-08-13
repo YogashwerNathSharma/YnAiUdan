@@ -43,8 +43,8 @@ model Project {
   name          String
   slug          String
   instructions  String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
   tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   members       ProjectMember[]
   conversations Conversation[]
@@ -83,7 +83,7 @@ model Conversation {
 }
 
 model Message {
-  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  id             String       @id @default(auto()) @map("_id")
   conversationId String       @db.ObjectId
   role           MessageRole
   content        String
@@ -120,11 +120,14 @@ model Task {
   userId          String       @db.ObjectId
   projectId       String?      @db.ObjectId
   title           String
+  goal            String
   status          TaskStatus   @default(QUEUED)
   autonomyMode    AutonomyMode @default(ASK_BEFORE_TOOLS)
   maxSteps        Int?
   maxToolCalls    Int?
   maxExecutionMs  Int?
+  maxRetries      Int?         @default(3)
+  startedAt       DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   tenant          Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -139,8 +142,10 @@ model Task {
 model TaskStep {
   id          String     @id @default(auto()) @map("_id") @db.ObjectId
   taskId      String     @db.ObjectId
-  sequence    Int
-  name        String
+  sequence    Int?
+  name        String?
+  stepNumber  Int?
+  type        TaskStepType?
   status      StepStatus @default(PENDING)
   input       Json?
   output      Json?
@@ -149,7 +154,6 @@ model TaskStep {
   completedAt DateTime?
   task        Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  @@unique([taskId, sequence])
   @@index([taskId])
 }
 
@@ -201,6 +205,13 @@ enum StepStatus {
   COMPLETED
   FAILED
   SKIPPED
+}
+
+enum TaskStepType {
+  PLAN
+  TOOL
+  VALIDATION
+  RESULT
 }
 
 enum AutonomyMode {
