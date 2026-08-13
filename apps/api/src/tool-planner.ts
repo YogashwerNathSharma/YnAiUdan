@@ -1,0 +1,24 @@
+import { z } from "zod";
+import { toolRegistry } from "./tools.js";
+import { resolveProvider, type AIChatMessage } from "./ai.js";
+
+const planSchema = z.object({ steps: z.array(z.object({ tool: z.string().min(1), input: z.record(z.string(), z.unknown()).default({}), reason: z.string().min(1).max(500) })).max(100) });
+
+export async function planToolSteps(goal: string, model = "mock:default") {
+  const tools = toolRegistry.list();
+  const catalog = tools.map(tool => `${tool.name}: ${tool.description}; risk=${tool.risk}; permissions=${tool.permissions.join(",") || "none"}`).join("\n");
+  const messages: AIChatMessage[] = [
+    { role: "system", content: "You are the YnAiUdan tool planner. Select only tools from the supplied catalog. Return ONLY valid JSON matching {\"steps\":[{\"tool\":string,\"input\":object,\"reason\":string}]}. Never invent tools. Do not execute anything." },
+    { role: "user", content: `Goal:\n${goal}\n\nAvailable tools:\n${catalog}` }
+  ];
+  const result = await resolveProvider(model).chat({ model, messages });
+  const parsed = planSchema.safeParse(JSON.parse(result.content));
+  if (!parsed.success) throw new Error("AI returned an invalid tool plan");
+  for (const step of parsed.data.steps) {
+    const tool = toolRegistry.get(step.tool);
+    if (!tool) throw new Error(`Planner selected unknown tool: ${step.tool}`);
+    const input = tool.inputSchema.safeParse(step.input);
+    if (!input.success) throw new Error(`Planner generated invalid input for tool: ${step.tool}`);
+  }
+  return parsed.data.steps;
+}
