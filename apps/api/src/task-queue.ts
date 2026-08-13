@@ -9,6 +9,9 @@ class TaskQueue {
   configure(config: Partial<QueueConfig>): void { this.config = { ...this.config, ...config }; }
   setBackend(backend: TaskQueueBackend): void { if (this.running) throw new Error("Cannot replace queue backend while running"); this.backend = backend; }
   async enqueue(taskId: string): Promise<QueueJob> { if (await this.backend.size() >= this.config.maxInMemoryItems) throw new Error("Task queue capacity reached"); return this.backend.enqueue(taskId); }
+  async complete(jobId: string): Promise<void> { await this.backend.complete?.(jobId); }
+  async fail(jobId: string, error: string): Promise<void> { await this.backend.fail?.(jobId, error); }
+  async recoverStale(maxAgeMs: number): Promise<number> { return this.backend.recoverStale?.(maxAgeMs) ?? 0; }
   async size(): Promise<number> { return this.backend.size(); }
   activeWorkers(): number { return this.active; }
   async start(worker: (item: QueueJob) => Promise<void>): Promise<void> {
