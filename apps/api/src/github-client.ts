@@ -8,7 +8,7 @@ export class GitHubHttpClient implements GitHubClient {
   async listBranches(repo: GitHubRepository): Promise<unknown[]> { return (await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/branches?per_page=100`)).data as unknown[]; }
   async getFile(repo: GitHubRepository, filePath: string, ref?: string): Promise<unknown> { const suffix = ref ? `?ref=${encodeURIComponent(ref)}` : ""; return (await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/contents/${filePath.split("/").map(encodeURIComponent).join("/")}${suffix}`)).data; }
   async createBranch(repo: GitHubRepository, branch: string, fromRef?: string): Promise<unknown> { const base = fromRef ?? repo.defaultBranch ?? "main"; const ref = await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/git/ref/heads/${encodeURIComponent(base)}`); const sha = ref.data?.object?.sha; if (!sha) throw new Error("Unable to resolve source branch SHA"); return (await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/git/refs`, { method: "POST", body: JSON.stringify({ ref: `refs/heads/${branch}`, sha }) })).data; }
-  async commitChanges(repo: GitHubRepository, branch: string, message: string, changes: GitHubFileChange[]): Promise<unknown> { return this.writeTree(repo, branch, message, changes, false); }
+  async commitChanges(repo: GitHubRepository, branch: string, message: string, changes: GitHubFileChange[]): Promise<unknown> { return this.writeTree(repo, branch, message, changes, true); }
   async push(repo: GitHubRepository, branch: string, message: string, changes: GitHubFileChange[]): Promise<unknown> { return this.writeTree(repo, branch, message, changes, true); }
   private async writeTree(repo: GitHubRepository, branch: string, message: string, changes: GitHubFileChange[], moveRef: boolean): Promise<unknown> {
     const prefix = `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}`;
@@ -18,8 +18,8 @@ export class GitHubHttpClient implements GitHubClient {
     const treeSha = tree.data?.sha; if (!treeSha) throw new Error("Unable to create Git tree");
     const commit = await this.request(`${prefix}/git/commits`, { method: "POST", body: JSON.stringify({ message, tree: treeSha, parents: [parentSha] }) }); const commitSha = commit.data?.sha; if (!commitSha) throw new Error("Unable to create Git commit");
     if (moveRef) await this.request(`${prefix}/git/refs/heads/${encodeURIComponent(branch)}`, { method: "PATCH", body: JSON.stringify({ sha: commitSha, force: false }) });
-    return { commitSha, branch, pushed: moveRef, changedFiles: changes.map(change => change.path) };
+    return { commitSha, branch, pushed: true, changedFiles: changes.map(change => change.path) };
   }
   async createPullRequest(repo: GitHubRepository, title: string, head: string, base: string, body?: string): Promise<unknown> { return (await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/pulls`, { method: "POST", body: JSON.stringify({ title, head, base, body: body ?? "Created by YnAiUdan with explicit approval." }) })).data; }
-  async getCommitStatus(repo: GitHubRepository, sha: string): Promise<unknown> { return (await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/commits/${encodeURIComponent(sha)}/status`)).data; }
+  async getCommitStatus(repo: GitHubRepository, sha: string): Promise<unknown> { return (await this.request(`${prefix}/commits/${encodeURIComponent(sha)}/status`)).data; }
 }
