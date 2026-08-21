@@ -1,6 +1,7 @@
 import { db } from "./db.js";
 import { executeTool } from "./tool-executor.js";
 import { saveTaskMemory } from "./memory-service.js";
+import { normalizeAutonomyMode } from "./permissions.js";
 
 function compactMemoryValue(value: unknown): string {
   try {
@@ -46,7 +47,7 @@ export async function executeNextTaskStep(taskId: string, userId: string, tenant
   const input = (step.input ?? {}) as { toolName?: string; input?: unknown };
   if (!input.toolName) throw new Error("Tool step is missing toolName");
   await db.taskStep.update({ where: { id: step.id }, data: { status: "RUNNING", startedAt: new Date() } });
-  const result = await executeTool({ toolName: input.toolName, input: input.input, role, mode: task.autonomyMode, context: { userId, tenantId, projectId: task.projectId ?? undefined } });
+  const result = await executeTool({ toolName: input.toolName, input: input.input, role, mode: normalizeAutonomyMode(task.autonomyMode), context: { userId, tenantId, projectId: task.projectId ?? undefined } });
   if (result.ok) {
     await db.taskStep.update({ where: { id: step.id }, data: { status: "COMPLETED", output: result.output as object, completedAt: new Date() } });
     await persistExecutionMemory(task, input as { toolName: string; input?: unknown }, result);
