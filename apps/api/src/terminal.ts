@@ -24,8 +24,9 @@ export function registerTerminalTool(): void {
     permissions: ["TERMINAL_EXECUTE"],
     timeoutMs: 120_000,
     execute: async ({ command }, context) => {
+      if (!context?.tenantId || !context.userId) throw new Error("Tenant and user context are required");
       const { executable, args } = parseCommand(command);
-      const cwd = workspaceRootFor({ tenantId: context?.tenantId, userId: context?.userId });
+      const cwd = workspaceRootFor({ tenantId: context.tenantId, userId: context.userId });
       await fs.mkdir(cwd, { recursive: true });
       return new Promise((resolve, reject) => {
         const child = spawn(executable, args, { cwd, shell: false, windowsHide: true, env: { PATH: process.env.PATH, NODE_ENV: "development" } });
