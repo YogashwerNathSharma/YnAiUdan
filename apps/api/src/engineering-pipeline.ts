@@ -1,7 +1,7 @@
 import { generateCoderWorkspaceChanges } from "./orchestrated-coder-adapter.js";
 import { reviewVerifyRepairWorkspace, type ReviewVerifyRepairResult } from "./review-verify-repair-loop.js";
+import { applyWorkspaceChanges, type SharedWorkspace, type WorkspaceChange } from "./workspace-context.js";
 import type { LlmProvider } from "./llm-provider.js";
-import type { SharedWorkspace, WorkspaceChange } from "./workspace-context.js";
 
 export type EngineeringPipelineResult = ReviewVerifyRepairResult & { summary: string; plan: string[] };
 
@@ -18,11 +18,7 @@ export async function runEngineeringPipeline(params: {
   repair?: (context: { task: string; workspace: SharedWorkspace; attempt: number; review: ReviewVerifyRepairResult["review"]; verification: ReviewVerifyRepairResult["verification"] }) => Promise<WorkspaceChange[] | null>;
 }): Promise<EngineeringPipelineResult> {
   const generated = await generateCoderWorkspaceChanges(params.provider, { task: params.task, workspace: params.workspace, model: params.model });
-  const seededWorkspace = {
-    ...params.workspace,
-    files: params.workspace.files,
-    changes: params.workspace.changes
-  };
+  const seededWorkspace = applyWorkspaceChanges(params.workspace, generated.changes);
   const result = await reviewVerifyRepairWorkspace({
     workspace: seededWorkspace,
     role: params.role,
