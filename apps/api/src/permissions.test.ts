@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
-import { canRunTool } from "./permissions.js";
+import { canRunTool, normalizeAutonomyMode } from "./permissions.js";
 import { toolRegistry } from "./tools.js";
 
 test("low-risk tools still require declared permissions", () => {
@@ -13,4 +13,11 @@ test("tool registry exposes risk and permission metadata", () => {
   assert.ok(echo);
   assert.equal(echo.risk, "LOW");
   assert.deepEqual(echo.permissions, []);
+});
+
+test("persisted autonomy values normalize to executable policy values", () => {
+  assert.equal(normalizeAutonomyMode("ASK_BEFORE_TOOLS"), "CONFIRM_TOOLS");
+  assert.equal(normalizeAutonomyMode("AUTO_SAFE"), "SAFE_AUTO");
+  assert.equal(normalizeAutonomyMode("SUGGEST_ACTIONS"), "SUGGEST");
+  assert.equal(normalizeAutonomyMode("unexpected"), "CONFIRM_TOOLS");
 });
