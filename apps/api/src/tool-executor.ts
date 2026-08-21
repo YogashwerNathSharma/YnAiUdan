@@ -1,9 +1,10 @@
 import { toolRegistry } from "./tools.js";
 import { canRunTool, type AutonomyMode } from "./permissions.js";
+import type { ToolExecutionContext } from "./tools.js";
 
 export type ToolExecutionResult = { ok: true; tool: string; output: unknown } | { ok: false; tool: string; error: string; requiresApproval?: boolean };
 
-export async function executeTool(params: { toolName: string; input: unknown; role: string; mode: AutonomyMode }): Promise<ToolExecutionResult> {
+export async function executeTool(params: { toolName: string; input: unknown; role: string; mode: AutonomyMode; context?: ToolExecutionContext }): Promise<ToolExecutionResult> {
   const tool = toolRegistry.get(params.toolName);
   if (!tool) return { ok: false, tool: params.toolName, error: "Tool not found" };
   if (!canRunTool(params.role, params.toolName, params.mode)) {
@@ -13,7 +14,7 @@ export async function executeTool(params: { toolName: string; input: unknown; ro
   if (!parsed.success) return { ok: false, tool: params.toolName, error: "Invalid tool input" };
   try {
     const output = await Promise.race([
-      tool.execute(parsed.data),
+      tool.execute(parsed.data, params.context),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Tool timeout")), tool.timeoutMs))
     ]);
     return { ok: true, tool: params.toolName, output };
