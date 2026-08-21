@@ -14,7 +14,12 @@ export async function runAgentBrain(taskId: string, options: BrainRunOptions) {
     if (!task) throw new Error("Task not found");
 
     if (task.status === "PLANNING") {
-      const steps = await planToolSteps(task.goal, task.model ?? "mock:default");
+      const steps = await planToolSteps(task.goal, task.model ?? "mock:default", {
+        userId: options.userId,
+        tenantId: options.tenantId,
+        projectId: task.projectId ?? undefined
+      });
+      if (steps.length === 0) throw new Error("Planner returned an empty plan");
       if (steps.length > (task.maxSteps ?? 50)) throw new Error("Generated plan exceeds task step limit");
       await db.taskStep.deleteMany({ where: { taskId: task.id } });
       await db.taskStep.createMany({ data: steps.map((step, index) => ({ taskId: task.id, sequence: index + 1, name: "TOOL", status: "PENDING" as const, input: { toolName: step.tool, input: step.input, reason: step.reason } })) });
@@ -25,6 +30,13 @@ export async function runAgentBrain(taskId: string, options: BrainRunOptions) {
 
     if (task.status === "WAITING_APPROVAL" || task.status === "PAUSED" || task.status === "COMPLETED" || task.status === "CANCELLED") return { status: task.status, cycles: cycle - 1, events };
     if (task.status !== "RUNNING") return { status: task.status, cycles: cycle - 1, events };
+
+    const completedToolSteps = task.steps.filter(step => step.name === "TOOL" && step.status === "COMPLETED").length;
+    if (task.maxToolCalls !== null && completedToolSteps >= task.maxToolCalls) {
+      await db.task.update({ where: { id: task.id }, data: { status: "PAUSED" } });
+      events.push({ cycle, phase: "GUARD", reason: "MAX_TOOL_CALLS_REACHED", maxToolCalls: task.maxToolCalls });
+      return { status: "PAUSED", cycles: cycle, events, reason: "MAX_TOOL_CALLS_REACHED" };
+    }
 
     const result = await executeNextTaskStep(task.id, options.userId, options.tenantId, options.role);
     events.push({ cycle, phase: "EXECUTE", result });
