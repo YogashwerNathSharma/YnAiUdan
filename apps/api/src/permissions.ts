@@ -19,7 +19,6 @@ export function hasPermission(role: string, permission: string): boolean { retur
 export function canRunTool(role: string, toolName: string, mode: AutonomyMode): boolean {
   const tool = toolRegistry.get(toolName);
   if (!tool || mode === "CHAT_ONLY" || mode === "SUGGEST") return false;
-  if (tool.risk === "LOW") return true;
   return tool.permissions.every(permission => hasPermission(role, permission));
 }
 
