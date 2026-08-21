@@ -1,13 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { requiresApproval, validateBranchName } from "./github-write-policy.js";
 
 describe("GitHub write policy", () => {
   it("requires approval for pushes and merges", () => {
-    expect(requiresApproval("PUSH", "feature/test")).toBe(true);
-    expect(requiresApproval("MERGE", "feature/test")).toBe(true);
+    assert.equal(requiresApproval("PUSH", "feature/test"), true);
+    assert.equal(requiresApproval("MERGE", "feature/test"), true);
   });
+
   it("rejects protected branches", () => {
-    expect(() => validateBranchName("main")).toThrow();
-    expect(() => validateBranchName("feature/agent-work")).not.toThrow();
+    assert.throws(() => validateBranchName("main"));
+    assert.doesNotThrow(() => validateBranchName("feature/agent-work"));
   });
 });
