@@ -1,9 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { githubActionPolicy, validateGitRef } from "./github-policy.js";
 
 describe("GitHub safety policy", () => {
-  it("allows read actions without approval", () => expect(githubActionPolicy("READ_REPOSITORY")).toEqual({ allowed: true, requiresApproval: false }));
-  it("requires approval for write actions", () => expect(githubActionPolicy("PUSH").requiresApproval).toBe(true));
-  it("rejects unsafe refs", () => expect(validateGitRef("../main")).toBe(false));
-  it("allows normal refs", () => expect(validateGitRef("feature/agent-work")).toBe(true));
+  it("allows read actions without approval", () => {
+    assert.deepEqual(githubActionPolicy("READ_REPOSITORY"), { allowed: true, requiresApproval: false });
+  });
+
+  it("requires approval for write actions", () => {
+    assert.equal(githubActionPolicy("PUSH").requiresApproval, true);
+  });
+
+  it("rejects unsafe refs", () => {
+    assert.equal(validateGitRef("../main"), false);
+  });
+
+  it("allows normal refs", () => {
+    assert.equal(validateGitRef("feature/agent-work"), true);
+  });
 });
