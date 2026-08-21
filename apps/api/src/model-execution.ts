@@ -1,4 +1,5 @@
 import { routeModel, routeProvider } from "./model-router.js";
+import { assertAIRequest } from "./ai-policy.js";
 import type { AIChatRequest, AIChatResponse } from "./ai.js";
 
 export type ModelExecutionLimits = { maxTokens?: number; timeoutMs?: number; maxRetries?: number };
@@ -14,10 +15,12 @@ export async function executeModel(request: Omit<AIChatRequest, "model"> & { tas
   const timeoutMs = intEnv("AI_REQUEST_TIMEOUT_MS", request.limits?.timeoutMs ?? 120_000, 1_000, 600_000);
   const retries = Math.min(10, Math.max(0, request.limits?.maxRetries ?? intEnv("AI_MAX_RETRIES", 2, 0, 10)));
   const maxTokens = request.limits?.maxTokens ?? intEnv("AI_MAX_OUTPUT_TOKENS", 16_384, 128, 131_072);
+  const inputCharacters = JSON.stringify(request.messages).length;
 
   const candidates = [...new Set([model, fallback])];
   let lastError: unknown;
   for (const candidate of candidates) {
+    assertAIRequest(request.task, candidate, inputCharacters, maxTokens);
     for (let attempt = 0; attempt <= retries; attempt += 1) {
       try {
         const provider = routeProvider(candidate);
