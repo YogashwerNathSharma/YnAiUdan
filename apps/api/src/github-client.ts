@@ -21,5 +21,5 @@ export class GitHubHttpClient implements GitHubClient {
     return { commitSha, branch, pushed: true, changedFiles: changes.map(change => change.path) };
   }
   async createPullRequest(repo: GitHubRepository, title: string, head: string, base: string, body?: string): Promise<unknown> { return (await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/pulls`, { method: "POST", body: JSON.stringify({ title, head, base, body: body ?? "Created by YnAiUdan with explicit approval." }) })).data; }
-  async getCommitStatus(repo: GitHubRepository, sha: string): Promise<unknown> { return (await this.request(`${prefix}/commits/${encodeURIComponent(sha)}/status`)).data; }
+  async getCommitStatus(repo: GitHubRepository, sha: string): Promise<unknown> { const prefix = `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}`; return (await this.request(`${prefix}/commits/${encodeURIComponent(sha)}/status`)).data; }
 }
