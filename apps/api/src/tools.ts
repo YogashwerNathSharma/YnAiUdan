@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export type ToolRisk = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type ToolExecutionContext = { userId?: string; tenantId?: string; projectId?: string };
 export type ToolDefinition<TInput = unknown, TOutput = unknown> = {
   name: string;
   description: string;
@@ -8,7 +9,7 @@ export type ToolDefinition<TInput = unknown, TOutput = unknown> = {
   risk: ToolRisk;
   permissions: string[];
   timeoutMs: number;
-  execute: (input: TInput) => Promise<TOutput>;
+  execute: (input: TInput, context?: ToolExecutionContext) => Promise<TOutput>;
 };
 
 export class ToolRegistry {
