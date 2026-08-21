@@ -5,11 +5,12 @@ import { z } from "zod";
 import { authenticate } from "./auth.js";
 import { db } from "./db.js";
 import { executeTool } from "./tool-executor.js";
-import { writeWorkspaceFile } from "./workspace.js";
+import { writeWorkspaceFile, workspaceRootFor } from "./workspace.js";
 
 type AuthPayload = { sub: string; tenantId: string; role: string };
-const inspectSchema = z.object({ path: z.string().max(1000).default(""), maxEntries: z.number().int().min(1).max(500).default(200) });
-const editSchema = z.object({ path: z.string().min(1).max(1000), content: z.string().max(2_000_000), mode: z.enum(["SAFE_AUTO", "CONFIRM_TOOLS", "AUTONOMOUS", "FULLY_CONTROLLED"]).default("CONFIRM_TOOLS") });
+const relativePath = z.string().max(1000).refine(value => !path.isAbsolute(value) && !value.split(/[\\/]/).includes(".."), "Invalid workspace path");
+const inspectSchema = z.object({ path: relativePath.default(""), maxEntries: z.number().int().min(1).max(500).default(200) });
+const editSchema = z.object({ path: relativePath.min(1), content: z.string().max(2_000_000), mode: z.enum(["SAFE_AUTO", "CONFIRM_TOOLS", "AUTONOMOUS", "FULLY_CONTROLLED"]).default("CONFIRM_TOOLS") });
 
 async function inspectDirectory(root: string, relative: string, maxEntries: number) {
   const output: Array<{ path: string; type: "file" | "directory" }> = [];
@@ -31,8 +32,9 @@ async function inspectDirectory(root: string, relative: string, maxEntries: numb
 
 export async function registerCodeAgentRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/v1/coding/inspect", { preHandler: authenticate }, async (request, reply) => {
+    const auth = request.user as AuthPayload;
     const input = inspectSchema.parse(request.body);
-    const root = path.resolve(process.env.WORKSPACE_ROOT ?? path.join(process.cwd(), ".ynaiudan-workspaces"));
+    const root = workspaceRootFor({ tenantId: auth.tenantId, userId: auth.sub });
     try {
       await fs.mkdir(root, { recursive: true });
       const files = await inspectDirectory(root, input.path, input.maxEntries);
@@ -43,7 +45,7 @@ export async function registerCodeAgentRoutes(app: FastifyInstance): Promise<voi
   app.post("/api/v1/coding/edit", { preHandler: authenticate }, async (request, reply) => {
     const auth = request.user as AuthPayload;
     const input = editSchema.parse(request.body);
-    const result = await executeTool({ toolName: "workspace.write", input, role: auth.role, mode: input.mode });
+    const result = await executeTool({ toolName: "workspace.write", input, role: auth.role, mode: input.mode, context: { tenantId: auth.tenantId, userId: auth.sub } });
     return reply.status(result.ok ? 200 : result.requiresApproval ? 403 : 400).send(result);
   });
 
@@ -55,7 +57,7 @@ export async function registerCodeAgentRoutes(app: FastifyInstance): Promise<voi
     if (task.status !== "RUNNING") return reply.code(409).send({ error: "Task must be RUNNING before execution" });
     const next = task.steps.find(step => step.status === "PENDING");
     if (!next) return reply.send({ status: "complete", taskId: task.id });
-    if (next.stepNumber > task.maxSteps) return reply.code(409).send({ error: "Task step limit reached" });
+    if (next.stepNumber !== null && task.maxSteps !== null && next.stepNumber > task.maxSteps) return reply.code(409).send({ error: "Task step limit reached" });
     await db.taskStep.update({ where: { id: next.id }, data: { status: "RUNNING", startedAt: new Date() } });
     const updated = await db.taskStep.update({ where: { id: next.id }, data: { status: "COMPLETED", completedAt: new Date(), output: { note: "Step execution boundary is ready; concrete tool selection is required before side effects." } } });
     return reply.send({ taskId: task.id, step: updated, nextAction: "select_tool" });
