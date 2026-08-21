@@ -23,14 +23,13 @@ export async function recoverFromCiFailure(params: {
     if (!diagnosis.retryable) return { status: "NEEDS_REVIEW", attempts: attempt - 1, diagnoses, finalStatus: status };
     const changes = await params.fix(diagnosis, attempt);
     if (!changes?.length) return { status: "FAILED", attempts: attempt, diagnoses, finalStatus: status };
-    await params.client.commitChanges(params.repo, params.branch, params.commitMessage, changes);
-    const ref = await params.client.getFile(params.repo, ".git/HEAD", params.branch).catch(() => null);
-    void ref;
+    const commit = await params.client.commitChanges(params.repo, params.branch, params.commitMessage, changes);
+    const commitSha = (commit as { commitSha?: string }).commitSha;
+    if (!commitSha) return { status: "NEEDS_REVIEW", attempts: attempt, diagnoses, finalStatus: status };
     if (!params.client.getCommitStatus) return { status: "NEEDS_REVIEW", attempts: attempt, diagnoses, finalStatus: status };
-    const latest = await params.client.getCommitStatus(params.repo, "HEAD");
-    status = latest;
-    const state = (latest as { state?: string })?.state;
-    if (state === "success") return { status: "FIXED", attempts: attempt, diagnoses, finalStatus: latest };
+    status = await params.client.getCommitStatus(params.repo, commitSha);
+    const state = (status as { state?: string })?.state;
+    if (state === "success") return { status: "FIXED", attempts: attempt, diagnoses, finalStatus: status };
   }
   return { status: "FAILED", attempts: maxAttempts, diagnoses, finalStatus: status };
 }
