@@ -16,7 +16,8 @@ export function registerCodingTools(): void {
     permissions: ["FILE_WRITE"],
     timeoutMs: 10_000,
     execute: async (input, context) => {
-      await writeWorkspaceFile(input.path, input.content, { tenantId: context?.tenantId, userId: context?.userId });
+      if (!context?.tenantId || !context.userId) throw new Error("Tenant and user context are required");
+      await writeWorkspaceFile(input.path, input.content, { tenantId: context.tenantId, userId: context.userId });
       return { path: input.path, bytes: Buffer.byteLength(input.content, "utf8") };
     }
   });
