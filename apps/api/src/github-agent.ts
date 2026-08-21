@@ -14,6 +14,7 @@ export type GitHubClient = {
   push(repository: GitHubRepository, branch: string, message: string, changes: GitHubFileChange[]): Promise<unknown>;
   createPullRequest(repository: GitHubRepository, title: string, head: string, base: string, body?: string): Promise<unknown>;
   getCommitStatus?(repository: GitHubRepository, sha: string): Promise<unknown>;
+  getBranchSha?(repository: GitHubRepository, branch: string): Promise<string>;
 };
 
 export class GitHubProviderRegistry {
@@ -28,18 +29,9 @@ const branchSchema = z.string().regex(/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/)
 const changesSchema = z.array(z.object({ path: z.string().min(1).max(1000).refine(value => !value.startsWith("/") && !value.split("/").includes(".."), "Invalid repository path"), content: z.string().max(2_000_000) })).min(1).max(100);
 const protectedBranches = new Set(["main", "master", "production", "prod"]);
 const writeRoles = new Set(["OWNER", "ADMIN", "DEVELOPER"]);
-
 function repositoryKey(repo: GitHubRepository): string { return `${repo.owner}/${repo.name}`.toLowerCase(); }
-function isRepositoryAllowed(repo: GitHubRepository): boolean {
-  const configured = (process.env.GITHUB_ALLOWED_REPOSITORIES ?? "").split(",").map(value => value.trim().toLowerCase()).filter(Boolean);
-  return configured.includes(repositoryKey(repo));
-}
-function assertWriteAccess(auth: AuthPayload, repo: GitHubRepository, branch: string, operation: "BRANCH" | "COMMIT" | "PUSH" | "PR"): void {
-  if (!writeRoles.has(auth.role)) throw new Error("GitHub write access requires developer permissions");
-  if (!isRepositoryAllowed(repo)) throw new Error("Repository is not in GITHUB_ALLOWED_REPOSITORIES");
-  if (operation !== "PR" && protectedBranches.has(branch.toLowerCase())) throw new Error("Protected branches cannot be modified directly; use a feature branch and pull request");
-  if (operation === "PUSH" && auth.role !== "OWNER") throw new Error("Direct GitHub push requires OWNER permission");
-}
+function isRepositoryAllowed(repo: GitHubRepository): boolean { const configured = (process.env.GITHUB_ALLOWED_REPOSITORIES ?? "").split(",").map(value => value.trim().toLowerCase()).filter(Boolean); return configured.includes(repositoryKey(repo)); }
+function assertWriteAccess(auth: AuthPayload, repo: GitHubRepository, branch: string, operation: "BRANCH" | "COMMIT" | "PUSH" | "PR"): void { if (!writeRoles.has(auth.role)) throw new Error("GitHub write access requires developer permissions"); if (!isRepositoryAllowed(repo)) throw new Error("Repository is not in GITHUB_ALLOWED_REPOSITORIES"); if (operation !== "PR" && protectedBranches.has(branch.toLowerCase())) throw new Error("Protected branches cannot be modified directly; use a feature branch and pull request"); if (operation === "PUSH" && auth.role !== "OWNER") throw new Error("Direct GitHub push requires OWNER permission"); }
 
 export async function registerGitHubAgentRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/v1/github/status", { preHandler: authenticate }, async request => { const auth = request.user as AuthPayload; return { configured: githubRegistry.configured(), tenantId: auth.tenantId, capabilities: ["repository.read", "branch.read", "file.read", "branch.create", "commit", "push", "pull_request", "ci.read"] }; });
