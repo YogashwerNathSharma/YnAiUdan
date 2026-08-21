@@ -1,11 +1,12 @@
-import { autoFix } from "./auto-fix.js";
 import { reviewChanges, type ChangeRecord, type ChangeReview } from "./change-reviewer.js";
+import { fullReview, type FullReview } from "./full-reviewer.js";
 import { verifyCodeChange, type VerificationResult } from "./code-verification.js";
 import type { AutonomyMode } from "./permissions.js";
 
 export type CodingAgentRun = {
   verification: VerificationResult[];
   changeReview: ChangeReview;
+  fullReview: FullReview;
   fixAttempts: number;
   status: "VERIFIED" | "NEEDS_REVIEW" | "FAILED";
 };
@@ -18,6 +19,8 @@ export async function runCodingVerification(params: {
   projectId?: string;
   requestedPaths?: string[];
   changes: ChangeRecord[];
+  reviewFiles?: Array<{ path: string; content: string }>;
+  packageJson?: { dependencies?: Record<string,string>; devDependencies?: Record<string,string>; scripts?: Record<string,string> };
   commands?: string[];
   maxFixAttempts?: number;
   fix?: (failure: VerificationResult, attempt: number) => Promise<boolean>;
@@ -36,11 +39,13 @@ export async function runCodingVerification(params: {
   }
 
   const changeReview = reviewChanges(params.changes, params.requestedPaths);
+  const full = fullReview({ files: params.reviewFiles ?? [], packageJson: params.packageJson });
   const verified = verification.length > 0 && verification.every(result => result.ok);
-  const safe = changeReview.approved;
+  const safe = changeReview.approved && full.approved;
   return {
     verification,
     changeReview,
+    fullReview: full,
     fixAttempts,
     status: verified && safe ? "VERIFIED" : verified ? "NEEDS_REVIEW" : "FAILED"
   };
