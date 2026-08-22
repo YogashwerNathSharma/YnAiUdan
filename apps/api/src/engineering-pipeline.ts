@@ -26,9 +26,9 @@ export async function runEngineeringPipeline(params: {
     projectId: params.projectId,
     commands: params.commands,
     maxAttempts: params.maxAttempts,
-    repair: async (diagnosis, review, verification, attempt) => {
+    repair: async (diagnosis, review, verification, attempt, workspace) => {
       if (!params.repair) return null;
-      return params.repair({ task: `${params.task}\nDebugger diagnosis: ${diagnosis.summary}`, workspace: seededWorkspace, attempt, review, verification });
+      return params.repair({ task: `${params.task}\nDebugger diagnosis: ${diagnosis.summary}`, workspace, attempt, review, verification });
     }
   });
   return { ...result, summary: generated.summary, plan: generated.plan };
