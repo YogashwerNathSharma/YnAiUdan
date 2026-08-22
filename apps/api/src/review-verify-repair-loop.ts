@@ -14,7 +14,7 @@ export async function reviewVerifyRepairWorkspace(params: {
   commands?: string[];
   packageJson?: { dependencies?: Record<string,string>; devDependencies?: Record<string,string>; scripts?: Record<string,string> };
   maxAttempts?: number;
-  repair: (diagnosis: DebugDiagnosis, review: ReturnType<typeof reviewWorkspace>, verification: VerificationResult[], attempt: number) => Promise<WorkspaceChange[] | null>;
+  repair: (diagnosis: DebugDiagnosis, review: ReturnType<typeof reviewWorkspace>, verification: VerificationResult[], attempt: number, workspace: SharedWorkspace) => Promise<WorkspaceChange[] | null>;
 }): Promise<ReviewVerifyRepairResult> {
   const maxAttempts = Math.min(3, Math.max(1, params.maxAttempts ?? 2));
   let workspace = params.workspace;
@@ -29,7 +29,7 @@ export async function reviewVerifyRepairWorkspace(params: {
     const diagnosis = diagnoseFailure(JSON.stringify({ review, verification }));
     diagnoses.push(diagnosis);
     if (!diagnosis.retryable) return { status: "NEEDS_REVIEW", attempts: attempt, review, verification, diagnoses, workspace };
-    const changes = await params.repair(diagnosis, review, verification, attempt + 1);
+    const changes = await params.repair(diagnosis, review, verification, attempt + 1, workspace);
     if (!changes?.length) return { status: "FAILED", attempts: attempt + 1, review, verification, diagnoses, workspace };
     workspace = applyWorkspaceChanges(workspace, changes);
   }
