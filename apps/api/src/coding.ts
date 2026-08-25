@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { authenticate } from "./auth.js";
 import { toolRegistry } from "./tools.js";
 import { executeTool } from "./tool-executor.js";
@@ -23,7 +24,7 @@ export async function registerCodingRoutes(app: FastifyInstance): Promise<void> 
   app.post("/api/v1/coding/command", { preHandler: authenticate }, async (request, reply) => {
     const auth = request.user as { tenantId: string; role: string };
     const input = commandSchema.parse(request.body);
-    const result = await executeTool({ toolName: "terminal.execute", input: { ...input, tenantId: auth.tenantId }, tenantId: auth.tenantId, role: auth.role, mode: input.mode });
+    const result = await executeTool({ toolName: "terminal.execute", input, tenantId: auth.tenantId, role: auth.role, mode: input.mode });
     return reply.status(result.ok ? 200 : result.requiresApproval ? 403 : 400).send(result);
   });
 }
