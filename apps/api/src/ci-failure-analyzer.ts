@@ -1,31 +1,10 @@
 import { z } from "zod";
 
-export const ciFailureCategorySchema = z.enum([
-  "TYPE_ERROR",
-  "TEST_FAILURE",
-  "LINT",
-  "BUILD",
-  "DEPENDENCY",
-  "RUNTIME",
-  "CONFIG",
-  "CI_INFRA",
-  "UNKNOWN"
-]);
+export const ciFailureCategorySchema = z.enum(["TYPE_ERROR", "TEST_FAILURE", "LINT", "BUILD", "DEPENDENCY", "RUNTIME", "CONFIG", "CI_INFRA", "UNKNOWN"]);
 export type CiFailureCategory = z.infer<typeof ciFailureCategorySchema>;
-
 export type CiStep = { name: string; conclusion?: string | null; status?: string | null; number?: number };
 export type CiJob = { id: number; name: string; conclusion?: string | null; status?: string | null; steps?: CiStep[] };
-
-export type CiFailureAnalysis = {
-  category: CiFailureCategory;
-  confidence: number;
-  failedJob?: string;
-  failedStep?: string;
-  evidence: string[];
-  downstreamSkipped: string[];
-  repairable: boolean;
-  recommendation: string;
-};
+export type CiFailureAnalysis = { category: CiFailureCategory; confidence: number; failedJob?: string; failedStep?: string; evidence: string[]; downstreamSkipped: string[]; repairable: boolean; recommendation: string; nextAction: "COLLECT_LOGS" | "REPAIR_CODE" | "REPAIR_CONFIG" | "HUMAN_REVIEW" };
 
 const patterns: Array<{ category: CiFailureCategory; regex: RegExp[] }> = [
   { category: "TYPE_ERROR", regex: [/TS\d{3,5}/i, /type .* is not assignable/i, /cannot find name/i] },
@@ -43,40 +22,19 @@ export function analyzeCiFailure(input: { jobs: CiJob[]; log?: string }): CiFail
   const failedStep = failedJob?.steps?.find(step => step.conclusion === "failure");
   const skipped = (failedJob?.steps ?? []).filter(step => step.conclusion === "skipped").map(step => step.name);
   const evidence: string[] = [];
-
   if (failedJob) evidence.push(`job:${failedJob.name}`);
   if (failedStep) evidence.push(`step:${failedStep.name}`);
   if (skipped.length) evidence.push(`downstream-skipped:${skipped.length}`);
-
   const text = input.log ?? "";
+
   for (const candidate of patterns) {
     if (candidate.regex.some(regex => regex.test(text))) {
-      return {
-        category: candidate.category,
-        confidence: 0.9,
-        failedJob: failedJob?.name,
-        failedStep: failedStep?.name,
-        evidence,
-        downstreamSkipped: skipped,
-        repairable: !["CI_INFRA", "RUNTIME"].includes(candidate.category),
-        recommendation: candidate.category === "DEPENDENCY" ? "Inspect package manager, lockfile and dependency compatibility before changing application code." : "Inspect the reported source/test/build context and generate the smallest safe patch."
-      };
+      const repairable = !["CI_INFRA", "RUNTIME"].includes(candidate.category);
+      return { category: candidate.category, confidence: 0.9, failedJob: failedJob?.name, failedStep: failedStep?.name, evidence, downstreamSkipped: skipped, repairable, recommendation: candidate.category === "DEPENDENCY" ? "Inspect package manager, lockfile and dependency compatibility before changing application code." : "Inspect the reported source/test/build context and generate the smallest safe patch.", nextAction: repairable ? "REPAIR_CODE" : "HUMAN_REVIEW" };
     }
   }
 
-  const infraStep = failedStep?.name && /setup-node|checkout|pnpm\/action-setup|upload|download|cache/i.test(failedStep.name);
-  if (infraStep || (failedJob && skipped.length > 0 && !text)) {
-    return {
-      category: "CI_INFRA",
-      confidence: infraStep ? 0.96 : 0.75,
-      failedJob: failedJob?.name,
-      failedStep: failedStep?.name,
-      evidence,
-      downstreamSkipped: skipped,
-      repairable: false,
-      recommendation: "Inspect the GitHub Actions runner/action configuration first. Do not modify application code until the CI environment failure is resolved."
-    };
-  }
-
-  return { category: "UNKNOWN", confidence: 0.2, failedJob: failedJob?.name, failedStep: failedStep?.name, evidence, downstreamSkipped: skipped, repairable: false, recommendation: "Collect the failed step log and additional check-run evidence before attempting a code repair." };
+  const infraStep = Boolean(failedStep?.name && /setup-node|checkout|pnpm\/action-setup|upload|download|cache/i.test(failedStep.name));
+  if (infraStep || (failedJob && skipped.length > 0 && !text)) return { category: "CI_INFRA", confidence: infraStep ? 0.96 : 0.75, failedJob: failedJob?.name, failedStep: failedStep?.name, evidence, downstreamSkipped: skipped, repairable: false, recommendation: "Inspect GitHub Actions runner/action configuration first. Do not modify application code until the CI environment failure is resolved.", nextAction: "REPAIR_CONFIG" };
+  return { category: "UNKNOWN", confidence: 0.2, failedJob: failedJob?.name, failedStep: failedStep?.name, evidence, downstreamSkipped: skipped, repairable: false, recommendation: "Collect the failed step log and additional check-run evidence before attempting a code repair.", nextAction: "COLLECT_LOGS" };
 }
