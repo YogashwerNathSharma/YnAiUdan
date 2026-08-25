@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { z } from "zod";
 import { canRunTool, normalizeAutonomyMode, requiresApproval } from "./permissions.js";
 import { toolRegistry } from "./tools.js";
 
@@ -18,7 +19,7 @@ test("restricted tools require approval before execution", () => {
   toolRegistry.register({
     name: "test.medium-risk",
     description: "test",
-    inputSchema: (await import("zod")).z.object({}),
+    inputSchema: z.object({}),
     risk: "MEDIUM",
     permissions: ["FILE_WRITE"],
     timeoutMs: 1000,
