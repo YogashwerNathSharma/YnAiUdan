@@ -17,6 +17,7 @@ model Tenant {
   projects Project[]
   tasks Task[]
   memories Memory[]
+  learningRecords LearningRecord[]
   queueJobs TaskQueueJob[]
   aiUsage AiUsage[]
   knowledgeDocuments KnowledgeDocument[]
@@ -35,27 +36,72 @@ model User {
   conversations Conversation[]
   tasks Task[]
   memories Memory[]
+  learningRecords LearningRecord[]
   aiUsage AiUsage[]
   knowledgeDocuments KnowledgeDocument[]
   @@index([tenantId])
 }
 model Project {
-  id String @id @default(auto()) @map("_id") tenantId String @db.ObjectId name String slug String instructions String? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Cascade) members ProjectMember[] conversations Conversation[] tasks Task[] memories Memory[] knowledgeDocuments KnowledgeDocument[] @@unique([tenantId, slug]) @@index([tenantId])
+  id String @id @default(auto()) @map("_id")
+  tenantId String @db.ObjectId
+  name String
+  slug String
+  instructions String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Cascade)
+  members ProjectMember[]
+  conversations Conversation[]
+  tasks Task[]
+  memories Memory[]
+  learningRecords LearningRecord[]
+  knowledgeDocuments KnowledgeDocument[]
+  @@unique([tenantId, slug])
+  @@index([tenantId])
 }
 model ProjectMember { id String @id @default(auto()) @map("_id") projectId String @db.ObjectId userId String @db.ObjectId role ProjectRole @default(MEMBER) project Project @relation(fields:[projectId], references:[id], onDelete:Cascade) user User @relation(fields:[userId], references:[id], onDelete:Cascade) @@unique([projectId,userId]) @@index([userId]) }
 model Conversation { id String @id @default(auto()) @map("_id") projectId String? @db.ObjectId userId String @db.ObjectId title String @default("New conversation") createdAt DateTime @default(now()) updatedAt DateTime @updatedAt project Project? @relation(fields:[projectId], references:[id], onDelete:SetNull) user User @relation(fields:[userId], references:[id], onDelete:Cascade) messages Message[] @@index([userId,updatedAt]) @@index([projectId,updatedAt]) }
 model Message { id String @id @default(auto()) @map("_id") conversationId String @db.ObjectId role MessageRole content String model String? createdAt DateTime @default(now()) conversation Conversation @relation(fields:[conversationId], references:[id], onDelete:Cascade) @@index([conversationId,createdAt]) }
 model Memory { id String @id @default(auto()) @map("_id") tenantId String @db.ObjectId userId String @db.ObjectId projectId String? @db.ObjectId type MemoryType key String value String importance Float @default(0.5) embedding Json? embeddingModel String? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Cascade) user User @relation(fields:[userId], references:[id], onDelete:Cascade) project Project? @relation(fields:[projectId], references:[id], onDelete:SetNull) @@index([tenantId,userId,updatedAt]) @@index([projectId,importance,updatedAt]) @@index([type,updatedAt]) }
+model LearningRecord {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId String @db.ObjectId
+  userId String @db.ObjectId
+  projectId String? @db.ObjectId
+  query String
+  normalizedQuery String
+  kind LearningKind
+  status LearningStatus @default(CANDIDATE)
+  mistake String?
+  rootCause String?
+  correction String?
+  solution String?
+  verification String?
+  confidence Float @default(0.5)
+  reuseCount Int @default(0)
+  successCount Int @default(0)
+  failureCount Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Cascade)
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  project Project? @relation(fields:[projectId], references:[id], onDelete:SetNull)
+  @@index([tenantId,userId,updatedAt])
+  @@index([projectId,status,updatedAt])
+  @@index([kind,status])
+}
 model KnowledgeDocument { id String @id @default(auto()) @map("_id") tenantId String @db.ObjectId userId String @db.ObjectId projectId String? @db.ObjectId title String source String? status KnowledgeStatus @default(PROCESSING) chunkCount Int @default(0) error String? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Cascade) user User @relation(fields:[userId], references:[id], onDelete:Cascade) project Project? @relation(fields:[projectId], references:[id], onDelete:SetNull) chunks KnowledgeChunk[] @@index([tenantId,userId,updatedAt]) @@index([projectId,status,updatedAt]) }
 model KnowledgeChunk { id String @id @default(auto()) @map("_id") chunkIndex Int content String embedding Json? embeddingModel String? documentId String @db.ObjectId document KnowledgeDocument @relation(fields:[documentId], references:[id], onDelete:Cascade) @@unique([documentId,chunkIndex]) @@index([documentId]) }
 model Task { id String @id @default(auto()) @map("_id") tenantId String @db.ObjectId userId String @db.ObjectId projectId String? @db.ObjectId title String goal String model String @default("mock:default") status TaskStatus @default(QUEUED) autonomyMode AutonomyMode @default(ASK_BEFORE_TOOLS) maxSteps Int? maxToolCalls Int? maxExecutionMs Int? maxRetries Int? @default(3) startedAt DateTime? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Cascade) user User @relation(fields:[userId], references:[id], onDelete:Cascade) project Project? @relation(fields:[projectId], references:[id], onDelete:SetNull) steps TaskStep[] queueJobs TaskQueueJob[] @@index([tenantId,status]) @@index([userId,createdAt]) }
 model TaskStep { id String @id @default(auto()) @map("_id") taskId String @db.ObjectId sequence Int? name String? stepNumber Int? type TaskStepType? status StepStatus @default(PENDING) input Json? output Json? error String? retryCount Int @default(0) startedAt DateTime? completedAt DateTime? task Task @relation(fields:[taskId], references:[id], onDelete:Cascade) @@index([taskId]) }
 model TaskQueueJob { id String @id @default(auto()) @map("_id") taskId String @db.ObjectId status QueueJobStatus @default(QUEUED) attempts Int @default(0) createdAt DateTime @default(now()) startedAt DateTime? finishedAt DateTime? error String? tenantId String @db.ObjectId tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Cascade) task Task @relation(fields:[taskId], references:[id], onDelete:Cascade) @@index([status,createdAt]) @@index([tenantId,status]) @@index([taskId]) }
-model AiUsage { id String @id @default(auto()) @map("_id") tenantId String @db.ObjectId userId String @db.ObjectId taskType String provider String model String inputTokens Int @default(0) outputTokens Int @default(0) latencyMs Int success Boolean createdAt DateTime @default(now()) error String? tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Cascade) user User @relation(fields:[userId], references:[id], onDelete:Cascade) @@index([tenantId,createdAt]) @@index([userId,createdAt]) @@index([model,createdAt]) }
+model AiUsage { id String @id @default(auto()) @map("_id") userId String @db.ObjectId tenantId String @db.ObjectId taskType String provider String model String inputTokens Int @default(0) outputTokens Int @default(0) latencyMs Int success Boolean createdAt DateTime @default(now()) error String? tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Cascade) user User @relation(fields:[userId], references:[id], onDelete:Cascade) @@index([tenantId,createdAt]) @@index([userId,createdAt]) @@index([model,createdAt]) }
 enum UserRole { OWNER ADMIN DEVELOPER USER AGENT }
 enum ProjectRole { OWNER EDITOR MEMBER VIEWER }
 enum MessageRole { USER ASSISTANT SYSTEM TOOL }
 enum MemoryType { CONVERSATION USER PROJECT TASK TOOL PREFERENCE }
+enum LearningKind { SOLUTION CORRECTION MISTAKE PATTERN PREFERENCE }
+enum LearningStatus { CANDIDATE VERIFIED REJECTED SUPERSEDED }
 enum KnowledgeStatus { PROCESSING READY FAILED }
 enum TaskStatus { QUEUED PLANNING RUNNING WAITING_APPROVAL PAUSED FAILED COMPLETED CANCELLED }
 enum StepStatus { PENDING RUNNING COMPLETED FAILED SKIPPED }
