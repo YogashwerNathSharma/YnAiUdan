@@ -29,6 +29,11 @@ export async function executeNextTaskStep(taskId: string, userId: string, tenant
     await db.task.update({ where: { id: task.id }, data: { status: "PAUSED" } });
     return { status: "PAUSED", reason: "MAX_STEPS_REACHED" };
   }
+  const completedToolCalls = task.steps.filter(step => step.name === "TOOL" && step.status === "COMPLETED").length;
+  if (task.maxToolCalls !== null && completedToolCalls >= task.maxToolCalls) {
+    await db.task.update({ where: { id: task.id }, data: { status: "PAUSED" } });
+    return { status: "PAUSED", reason: "MAX_TOOL_CALLS_REACHED" };
+  }
   const step = task.steps.find(candidate => candidate.status === "PENDING");
   if (!step) {
     await db.task.update({ where: { id: task.id }, data: { status: "COMPLETED" } });
@@ -38,10 +43,10 @@ export async function executeNextTaskStep(taskId: string, userId: string, tenant
     await db.taskStep.update({ where: { id: step.id }, data: { status: "COMPLETED", startedAt: new Date(), completedAt: new Date(), output: { acknowledged: true } } });
     return { status: "COMPLETED", stepId: step.id, next: true };
   }
-  const input = (step.input ?? {}) as { toolName?: string; input?: unknown };
+  const input = (step.input ?? {}) as { toolName?: string; input?: unknown; approvalGranted?: boolean };
   if (!input.toolName) throw new Error("Tool step is missing toolName");
   await db.taskStep.update({ where: { id: step.id }, data: { status: "RUNNING", startedAt: new Date() } });
-  const result = await executeTool({ toolName: input.toolName, input: input.input, role, mode: task.autonomyMode });
+  const result = await executeTool({ toolName: input.toolName, input: input.input, tenantId: task.tenantId, role, mode: task.autonomyMode, approvalGranted: input.approvalGranted === true });
   if (result.ok) {
     await db.taskStep.update({ where: { id: step.id }, data: { status: "COMPLETED", output: result.output as object, completedAt: new Date() } });
     await persistExecutionMemory(task, input as { toolName: string; input?: unknown }, result);
