@@ -19,10 +19,10 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
     try { await assertUsageAllowed(auth.tenantId, auth.sub, Math.ceil(input.message.length / 4)); }
     catch (error) { return reply.code(429).send({ error: error instanceof Error ? error.message : "AI usage limit reached" }); }
     await db.message.create({ data: { conversationId: conversation.id, role: "USER", content: input.message } });
-    const context = await resolveChatContext({ conversationId: conversation.id, userId: auth.sub, tenantId: auth.tenantId });
+    const context = await resolveChatContext({ conversationId: conversation.id, userId: auth.sub, tenantId: auth.tenantId, currentMessage: input.message });
     const startedAt = Date.now();
     try {
-      const result = await executeModel({ task: "chat", requestedModel: input.model, messages: [{ role: "system", content: `You are YnAiUdan. Use supplied project, memory, task and conversation context. Never claim a tool was used without a tool result.\n\n${context.systemContext}` }, { role: "user", content: input.message }] });
+      const result = await executeModel({ task: "chat", requestedModel: input.model, messages: [{ role: "system", content: `You are YnAiUdan. Use supplied project, memory, task and conversation context. Treat retrieved memory as prior experience, not unquestionable truth. Prefer verified experience, and never claim a previous solution is correct unless its evidence supports it. Never claim a tool was used without a tool result.\n\n${context.systemContext}` }, { role: "user", content: input.message }] });
       await recordAIUsage({ tenantId: auth.tenantId, userId: auth.sub, taskType: "chat", provider: providerFromModel(result.model), model: result.model, inputTokens: result.usage?.inputTokens, outputTokens: result.usage?.outputTokens, latencyMs: Date.now() - startedAt, success: true });
       const assistant = await db.message.create({ data: { conversationId: conversation.id, role: "ASSISTANT", content: result.content, model: result.model } });
       return reply.send({ message: { id: assistant.id, role: assistant.role, content: assistant.content, createdAt: assistant.createdAt }, model: result.model, context: { characters: context.characters, truncated: context.truncated, memories: context.selectedMemoryIds.length } });
