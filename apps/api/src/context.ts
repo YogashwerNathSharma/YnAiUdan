@@ -7,8 +7,10 @@ const schema = z.object({ project: z.object({ name: z.string(), instructions: z.
 export type ContextInput = z.infer<typeof schema>;
 export type ContextResult = { systemContext: string; selectedMemoryIds: string[]; includedMessageIds: string[]; truncated: boolean; characters: number };
 
-function relevance(item: z.infer<typeof item>, goal: string): number { const terms = goal.toLowerCase().split(/[^a-z0-9_]+/).filter(Boolean); if (!terms.length) return 0; const text = `${item.key ?? ""} ${item.content}`.toLowerCase(); return terms.reduce((score, term) => score + (text.includes(term) ? 1 : 0), 0); }
-function rank(items: z.infer<typeof item>[], goal: string): z.infer<typeof item>[] { return [...items].map(item => ({ item, score: relevance(item, goal), importance: item.importance ?? 0.5 })).sort((a, b) => (b.score * 2 + b.importance) - (a.score * 2 + a.importance)).map(entry => entry.item); }
+const STOP_WORDS = new Set(["the", "and", "for", "with", "this", "that", "from", "have", "will", "are", "you", "your", "please", "continue", "next", "karo", "ko", "hai", "me", "mein", "ka", "ki", "ke", "is"]);
+function termsFor(goal: string): string[] { return [...new Set(goal.toLowerCase().split(/[^a-z0-9_]+/).filter(term => term.length >= 3 && !STOP_WORDS.has(term)))].slice(0, 80); }
+function relevance(item: z.infer<typeof item>, terms: string[]): number { if (!terms.length) return 0; const key = (item.key ?? "").toLowerCase(); const text = `${key} ${item.content}`.toLowerCase(); return terms.reduce((score, term) => score + (key.includes(term) ? 3 : text.includes(term) ? 1 : 0), 0); }
+function rank(items: z.infer<typeof item>[], goal: string): z.infer<typeof item>[] { const terms = termsFor(goal); return [...items].map(item => ({ item, score: relevance(item, terms), importance: item.importance ?? 0.5 })).sort((a, b) => (b.score * 3 + b.importance) - (a.score * 3 + a.importance)).map(entry => entry.item); }
 
 export function buildContext(input: ContextInput): ContextResult {
   const max = input.maxChars; const goal = input.task?.goal ?? ""; let used = 0; let truncated = false; const sections: string[] = []; const selectedMemoryIds: string[] = []; const includedMessageIds: string[] = [];
