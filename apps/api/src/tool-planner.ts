@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { toolRegistry } from "./tools.js";
 import { executeModel } from "./model-execution.js";
 import type { AIChatMessage } from "./ai.js";
@@ -6,7 +7,6 @@ import { assertUsageAllowed } from "./quota.js";
 import { recordAIUsage } from "./ai-usage.js";
 
 const planSchema = z.object({ steps: z.array(z.object({ tool: z.string().min(1), input: z.record(z.string(), z.unknown()).default({}), reason: z.string().min(1).max(500) })).max(100) });
-
 type PlannerContext = { userId: string; tenantId: string; projectId?: string };
 
 export async function planToolSteps(goal: string, model = "mock:default", context?: PlannerContext) {
