@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { db } from "./db.js";
 import { executeNextTaskStep } from "./task-executor.js";
 import { planToolSteps } from "./tool-planner.js";
@@ -13,12 +14,14 @@ function diagnosticFromResult(result: unknown): string | undefined {
   const combined = [error, evidence, output].filter(Boolean).join("\n");
   return combined ? combined.slice(0, 30_000) : undefined;
 }
+function failureFingerprint(result: unknown): string | undefined { const diagnostic = diagnosticFromResult(result); if (!diagnostic) return undefined; return createHash("sha256").update(diagnostic.replace(/\b[0-9a-f]{7,64}\b/gi, "SHA").replace(/\b\d+\b/g, "N").trim().toLowerCase()).digest("hex"); }
 
 export async function runAgentBrain(taskId: string, options: BrainRunOptions) {
   const maxCycles = Math.min(100, Math.max(1, options.maxCycles ?? 20));
   const events: Array<Record<string, unknown>> = [];
   let replans = 0;
   let diagnosticEvidence: string | undefined;
+  const failureFingerprints = new Set<string>();
   for (let cycle = 1; cycle <= maxCycles; cycle += 1) {
     const task = await db.task.findFirst({ where: { id: taskId, userId: options.userId, tenantId: options.tenantId }, include: { steps: { orderBy: { sequence: "asc" } } } });
     if (!task) throw new Error("Task not found");
@@ -29,7 +32,7 @@ export async function runAgentBrain(taskId: string, options: BrainRunOptions) {
       await db.taskStep.deleteMany({ where: { taskId: task.id } });
       await db.taskStep.createMany({ data: steps.map((step, index) => ({ taskId: task.id, sequence: index + 1, name: "TOOL", status: "PENDING" as const, input: { toolName: step.tool, input: step.input, reason: step.reason } })) });
       await db.task.update({ where: { id: task.id }, data: { status: "WAITING_APPROVAL" } });
-      events.push({ cycle, phase: "PLAN", steps: steps.length, approvalRequired: true, usedDiagnosticEvidence: Boolean(diagnosticEvidence) });
+      events.push({ cycle, phase: "PLAN", steps: steps.length, approvalRequired: true, usedDiagnosticEvidence: Boolean(diagnosticEvidence), distinctFailureCount: failureFingerprints.size });
       return { status: "WAITING_APPROVAL", cycles: cycle, events };
     }
     if (["WAITING_APPROVAL", "PAUSED", "COMPLETED", "CANCELLED"].includes(task.status)) return { status: task.status, cycles: cycle - 1, events };
@@ -39,10 +42,13 @@ export async function runAgentBrain(taskId: string, options: BrainRunOptions) {
     if (["WAITING_APPROVAL", "PAUSED", "COMPLETED"].includes(result.status)) return { status: result.status, cycles: cycle, events };
     if (result.status === "FAILED") {
       diagnosticEvidence = diagnosticFromResult(result);
+      const fingerprint = failureFingerprint(result);
+      if (fingerprint && failureFingerprints.has(fingerprint)) { await db.task.update({ where: { id: task.id }, data: { status: "PAUSED" } }); events.push({ cycle, phase: "REPAIR_GUARD", reason: "REPEATED_FAILURE", fingerprint }); return { status: "PAUSED", reason: "REPEATED_FAILURE", cycles: cycle, events, replans, diagnosticEvidence: Boolean(diagnosticEvidence) }; }
+      if (fingerprint) failureFingerprints.add(fingerprint);
       if (!options.replanOnFailure || replans >= Math.max(0, task.maxRetries ?? 0)) return { status: "FAILED", cycles: cycle, events, replans, diagnosticEvidence: Boolean(diagnosticEvidence) };
       replans += 1;
       await db.task.update({ where: { id: task.id }, data: { status: "PLANNING" } });
-      events.push({ cycle, phase: "REPLAN", attempt: replans, reason: result.error ?? "step failed", hasDiagnosticEvidence: Boolean(diagnosticEvidence) });
+      events.push({ cycle, phase: "REPLAN", attempt: replans, reason: result.error ?? "step failed", hasDiagnosticEvidence: Boolean(diagnosticEvidence), failureFingerprint: fingerprint });
     }
   }
   return { status: "PAUSED", reason: "BRAIN_CYCLE_LIMIT", cycles: maxCycles, events, replans };
