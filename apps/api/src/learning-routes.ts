@@ -26,4 +26,10 @@ export async function registerLearningRoutes(app: FastifyInstance): Promise<void
     try { return await markLearningOutcome({ id, tenantId: auth.tenantId, userId: auth.sub, ...input }); }
     catch { return reply.code(404).send({ error: "Learning record not found" }); }
   });
+
+  app.post("/api/v1/learning/auto-capture", { preHandler: authenticate }, async request => {
+    const auth = request.user as AuthPayload;
+    const input = z.object({ projectId: z.string().optional(), query: z.string().min(1).max(10000), solution: z.string().max(20000).optional(), mistake: z.string().max(10000).optional(), rootCause: z.string().max(10000).optional(), correction: z.string().max(20000).optional(), verification: z.string().max(10000).optional(), success: z.boolean(), kind: kind.default("SOLUTION") }).parse(request.body);
+    return recordLearning({ tenantId: auth.tenantId, userId: auth.sub, projectId: input.projectId, query: input.query, kind: input.kind, solution: input.solution, mistake: input.mistake, rootCause: input.rootCause, correction: input.correction, verification: input.verification, verified: input.success, confidence: input.success ? 0.9 : 0.35 });
+  });
 }
