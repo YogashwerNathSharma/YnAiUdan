@@ -4,9 +4,9 @@ import { db } from "./db.js";
 
 export async function processTaskQueueItem(item: QueueJob): Promise<void> {
   try {
-    const task = await db.task.findUnique({ where: { id: item.taskId } });
+    const task = await db.task.findUnique({ where: { id: item.taskId }, include: { user: { select: { role: true } } } });
     if (!task || task.status !== "RUNNING") { await taskQueue.complete?.(item.id); return; }
-    const result = await executeNextTaskStep(task.id, task.userId, task.tenantId, "AGENT");
+    const result = await executeNextTaskStep(task.id, task.userId, task.tenantId, task.user.role);
     if (result.status === "COMPLETED" || result.status === "PAUSED" || result.status === "WAITING_APPROVAL") { await taskQueue.complete?.(item.id); return; }
     if (result.status === "FAILED") { await taskQueue.fail?.(item.id, result.error ?? "Task step failed"); return; }
     await taskQueue.complete?.(item.id);
