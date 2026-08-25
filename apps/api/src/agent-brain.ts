@@ -14,7 +14,7 @@ export async function runAgentBrain(taskId: string, options: BrainRunOptions) {
     if (!task) throw new Error("Task not found");
 
     if (task.status === "PLANNING") {
-      const steps = await planToolSteps(task.goal, task.model ?? "mock:default");
+      const steps = await planToolSteps(task.goal, task.model ?? "mock:default", { userId: options.userId, tenantId: options.tenantId, projectId: task.projectId ?? undefined });
       if (steps.length > (task.maxSteps ?? 50)) throw new Error("Generated plan exceeds task step limit");
       await db.taskStep.deleteMany({ where: { taskId: task.id } });
       await db.taskStep.createMany({ data: steps.map((step, index) => ({ taskId: task.id, sequence: index + 1, name: "TOOL", status: "PENDING" as const, input: { toolName: step.tool, input: step.input, reason: step.reason } })) });
