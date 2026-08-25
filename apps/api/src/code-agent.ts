@@ -9,7 +9,19 @@ import { writeWorkspaceFile } from "./workspace.js";
 
 type AuthPayload = { sub: string; tenantId: string; role: string };
 const inspectSchema = z.object({ path: z.string().max(1000).default(""), maxEntries: z.number().int().min(1).max(500).default(200) });
-const editSchema = z.object({ path: z.string().min(1).max(1000), content: z.string().max(2_000_000), mode: z.enum(["SAFE_AUTO", "CONFIRM_TOOLS", "AUTONOMOUS", "FULLY_CONTROLLED"]).default("CONFIRM_TOOLS") });
+const editSchema = z.object({ path: z.string().min(1).max(1000), content: z.string().max(2_000_000), mode: z.string().default("ASK_BEFORE_TOOLS") });
+const workspaceBase = path.resolve(process.env.WORKSPACE_ROOT ?? path.join(process.cwd(), ".ynaiudan-workspaces"));
+
+function tenantRoot(tenantId: string): string {
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(tenantId)) throw new Error("Invalid tenant id");
+  return path.resolve(workspaceBase, tenantId);
+}
+function safeRelative(root: string, relative: string): string {
+  if (path.isAbsolute(relative) || relative.split(/[\\/]/).includes("..")) throw new Error("Invalid workspace path");
+  const resolved = path.resolve(root, relative);
+  if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) throw new Error("Workspace path escapes sandbox");
+  return resolved;
+}
 
 async function inspectDirectory(root: string, relative: string, maxEntries: number) {
   const output: Array<{ path: string; type: "file" | "directory" }> = [];
@@ -25,14 +37,15 @@ async function inspectDirectory(root: string, relative: string, maxEntries: numb
       if (entry.isDirectory()) await walk(absolute);
     }
   }
-  await walk(path.resolve(root, relative));
+  await walk(safeRelative(root, relative));
   return output;
 }
 
 export async function registerCodeAgentRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/v1/coding/inspect", { preHandler: authenticate }, async (request, reply) => {
+    const auth = request.user as AuthPayload;
     const input = inspectSchema.parse(request.body);
-    const root = path.resolve(process.env.WORKSPACE_ROOT ?? path.join(process.cwd(), ".ynaiudan-workspaces"));
+    const root = tenantRoot(auth.tenantId);
     try {
       await fs.mkdir(root, { recursive: true });
       const files = await inspectDirectory(root, input.path, input.maxEntries);
@@ -43,7 +56,7 @@ export async function registerCodeAgentRoutes(app: FastifyInstance): Promise<voi
   app.post("/api/v1/coding/edit", { preHandler: authenticate }, async (request, reply) => {
     const auth = request.user as AuthPayload;
     const input = editSchema.parse(request.body);
-    const result = await executeTool({ toolName: "workspace.write", input, role: auth.role, mode: input.mode });
+    const result = await executeTool({ toolName: "workspace.write", input, tenantId: auth.tenantId, role: auth.role, mode: input.mode });
     return reply.status(result.ok ? 200 : result.requiresApproval ? 403 : 400).send(result);
   });
 
