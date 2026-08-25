@@ -6,5 +6,7 @@ export async function resolveChatContext(params: { conversationId: string; userI
   if (!conversation) throw new Error("Conversation not found");
   const memories = await db.memory.findMany({ where: { tenantId: params.tenantId, userId: params.userId, ...(conversation.projectId ? { projectId: conversation.projectId } : {}) }, orderBy: [{ importance: "desc" }, { updatedAt: "desc" }], take: 100 });
   const goal = params.currentMessage?.trim() || conversation.messages[0]?.content || "";
-  return buildContext({ project: conversation.project ? { name: conversation.project.name, instructions: conversation.project.instructions ?? undefined } : undefined, task: goal ? { goal, status: "CHAT" } : undefined, messages: conversation.messages.reverse().map(message => ({ id: message.id, role: message.role.toLowerCase(), content: message.content, importance: 0.5 })), memories: memories.map(memory => ({ id: memory.id, key: memory.key, content: memory.value, importance: memory.importance })), maxChars: params.maxChars ?? 60_000 });
+  const orderedMessages = [...conversation.messages].reverse();
+  const newestId = conversation.messages[0]?.id;
+  return buildContext({ project: conversation.project ? { name: conversation.project.name, instructions: conversation.project.instructions ?? undefined } : undefined, task: goal ? { goal, status: "CHAT" } : undefined, messages: orderedMessages.map((message, index) => ({ id: message.id, role: message.role.toLowerCase(), content: message.content, importance: message.id === newestId ? 1 : Math.max(0.5, 0.9 - index * 0.02) })), memories: memories.map(memory => ({ id: memory.id, key: memory.key, content: memory.value, importance: memory.importance })), maxChars: params.maxChars ?? 60_000 });
 }
