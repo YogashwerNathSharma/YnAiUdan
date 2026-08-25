@@ -1,5 +1,5 @@
 import { toolRegistry } from "./tools.js";
-import { canRunTool, normalizeAutonomyMode, requiresApproval, type AutonomyMode } from "./permissions.js";
+import { canRunTool, hasPermission, normalizeAutonomyMode, requiresApproval, type AutonomyMode } from "./permissions.js";
 
 export type ToolExecutionResult = { ok: true; tool: string; output: unknown } | { ok: false; tool: string; error: string; requiresApproval?: boolean };
 
@@ -10,10 +10,7 @@ export async function executeTool(params: { toolName: string; input: unknown; ro
   try { mode = normalizeAutonomyMode(params.mode); } catch { return { ok: false, tool: params.toolName, error: "Invalid autonomy mode" }; }
   const granted = params.approvalGranted === true;
   if (!canRunTool(params.role, params.toolName, mode, granted)) {
-    const permitted = tool.permissions.every(permission => {
-      const roleMap: Record<string, string[]> = { OWNER: ["FILE_READ", "FILE_WRITE", "FILE_DELETE", "TERMINAL_EXECUTE", "GITHUB_READ", "GITHUB_WRITE", "GITHUB_PUSH", "PR_CREATE", "GOOGLE_READ", "GOOGLE_WRITE", "DEPLOY", "PRODUCTION_ACCESS"], ADMIN: ["FILE_READ", "FILE_WRITE", "FILE_DELETE", "TERMINAL_EXECUTE", "GITHUB_READ", "GITHUB_WRITE", "PR_CREATE", "GOOGLE_READ", "GOOGLE_WRITE"], DEVELOPER: ["FILE_READ", "FILE_WRITE", "TERMINAL_EXECUTE", "GITHUB_READ", "GITHUB_WRITE", "PR_CREATE"], USER: ["FILE_READ", "GITHUB_READ", "GOOGLE_READ"], AGENT: ["FILE_READ", "GITHUB_READ"] };
-      return roleMap[params.role]?.includes(permission) ?? false;
-    });
+    const permitted = tool.permissions.every(permission => hasPermission(params.role, permission));
     if (!permitted) return { ok: false, tool: params.toolName, error: "Tool execution is not permitted for the current role" };
     return { ok: false, tool: params.toolName, error: "Tool execution requires approval in the current autonomy mode", requiresApproval: requiresApproval(tool.risk, mode) };
   }
