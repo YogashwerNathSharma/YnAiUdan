@@ -14,7 +14,8 @@ export async function executeTool(params: { toolName: string; input: unknown; te
     if (!permitted) return { ok: false, tool: params.toolName, error: "Tool execution is not permitted for the current role" };
     return { ok: false, tool: params.toolName, error: "Tool execution requires approval in the current autonomy mode", requiresApproval: requiresApproval(tool.risk, mode) };
   }
-  const toolInput = params.toolName === "workspace.write" && params.tenantId
+  const tenantScopedTool = (params.toolName === "workspace.write" || params.toolName === "terminal.execute") && params.tenantId;
+  const toolInput = tenantScopedTool
     ? { ...(params.input as Record<string, unknown>), tenantId: params.tenantId }
     : params.input;
   const parsed = tool.inputSchema.safeParse(toolInput);
