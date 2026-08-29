@@ -40,6 +40,7 @@ export async function findFailureLessons(query: string, context: { tenantId: str
 export async function markLearningOutcome(input: { id: string; tenantId: string; userId: string; success: boolean; verification?: string }) {
   const existing = await db.learningRecord.findFirst({ where: { id: input.id, tenantId: input.tenantId, userId: input.userId } }); if (!existing) throw new Error("Learning record not found");
   const total = existing.successCount + existing.failureCount + 1; const successCount = existing.successCount + (input.success ? 1 : 0); const failureCount = existing.failureCount + (input.success ? 0 : 1); const baseConfidence = clamp((existing.confidence * 0.7) + ((successCount / total) * 0.3)); const successRate = successCount / total;
-  const status = total >= 3 && successRate < 0.34 ? "REJECTED" : undefined; const confidence = status ? clamp(baseConfidence * 0.45) : total >= 3 && successRate < 0.60 ? clamp(baseConfidence * 0.70) : baseConfidence;
-  return db.learningRecord.update({ where: { id: existing.id }, data: { successCount, failureCount, confidence, ...(status ? { status } : {}), ...(input.verification ? { verification: input.verification.slice(0, 10000) } : {}) } });
+  if (total >= 3 && successRate < 0.34) return db.learningRecord.update({ where: { id: existing.id }, data: { successCount, failureCount, confidence: clamp(baseConfidence * 0.45), status: "REJECTED", ...(input.verification ? { verification: input.verification.slice(0, 10000) } : {}) } });
+  const confidence = total >= 3 && successRate < 0.60 ? clamp(baseConfidence * 0.70) : baseConfidence;
+  return db.learningRecord.update({ where: { id: existing.id }, data: { successCount, failureCount, confidence, ...(input.verification ? { verification: input.verification.slice(0, 10000) } : {}) } });
 }
