@@ -4,6 +4,7 @@ function normalizeQuery(query: string): string { return query.toLowerCase().repl
 function clamp(value: number): number { return Math.max(0, Math.min(1, value)); }
 function tokenize(value: string): Set<string> { return new Set(normalizeQuery(value).split(" ").filter(term => term.length >= 3)); }
 function lexicalScore(a: string, b: string): number { const left = tokenize(a); const right = tokenize(b); if (!left.size || !right.size) return 0; let overlap = 0; for (const term of left) if (right.has(term)) overlap++; return overlap / left.size; }
+function contentOf(row: { solution: string | null; correction: string | null }): string { return `${row.solution ?? ""} ${row.correction ?? ""}`; }
 
 export async function recordLearning(input: { tenantId: string; userId: string; projectId?: string; query: string; kind: "SOLUTION" | "CORRECTION" | "MISTAKE" | "PATTERN" | "PREFERENCE"; solution?: string; mistake?: string; rootCause?: string; correction?: string; verification?: string; confidence?: number; verified?: boolean }) {
   const normalizedQuery = normalizeQuery(input.query);
@@ -12,6 +13,15 @@ export async function recordLearning(input: { tenantId: string; userId: string; 
   if (duplicate) {
     const successCount = duplicate.successCount + (input.verified ? 1 : 0); const confidence = clamp(Math.max(duplicate.confidence, input.confidence ?? 0.5));
     return db.learningRecord.update({ where: { id: duplicate.id }, data: { status: input.verified ? "VERIFIED" : duplicate.status, solution: input.solution?.slice(0, 20000) ?? duplicate.solution, mistake: input.mistake?.slice(0, 10000) ?? duplicate.mistake, rootCause: input.rootCause?.slice(0, 10000) ?? duplicate.rootCause, correction: input.correction?.slice(0, 20000) ?? duplicate.correction, verification: input.verification?.slice(0, 10000) ?? duplicate.verification, confidence, successCount } });
+  }
+  if (input.verified && ["SOLUTION", "CORRECTION", "PATTERN", "PREFERENCE"].includes(input.kind)) {
+    const similar = existing.filter(row => lexicalScore(normalizedQuery, row.normalizedQuery) >= 0.80 && row.status === "VERIFIED");
+    for (const row of similar) {
+      const oldContent = contentOf(row); const newContent = `${input.solution ?? ""} ${input.correction ?? ""}`;
+      if (newContent.trim() && oldContent.trim() && lexicalScore(newContent, oldContent) < 0.35) {
+        await db.learningRecord.update({ where: { id: row.id }, data: { status: "SUPERSEDED", confidence: Math.min(row.confidence, 0.25) } });
+      }
+    }
   }
   return db.learningRecord.create({ data: { tenantId: input.tenantId, userId: input.userId, projectId: input.projectId, query: input.query.slice(0, 10000), normalizedQuery, kind: input.kind, status: input.verified ? "VERIFIED" : "CANDIDATE", solution: input.solution?.slice(0, 20000), mistake: input.mistake?.slice(0, 10000), rootCause: input.rootCause?.slice(0, 10000), correction: input.correction?.slice(0, 20000), verification: input.verification?.slice(0, 10000), confidence: clamp(input.confidence ?? (input.verified ? 0.9 : 0.5)) } });
 }
