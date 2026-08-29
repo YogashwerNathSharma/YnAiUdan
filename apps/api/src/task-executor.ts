@@ -2,6 +2,7 @@ import { db } from "./db.js";
 import { executeTool } from "./tool-executor.js";
 import { saveTaskMemory } from "./memory-service.js";
 import { recordLearning } from "./learning-service.js";
+import { captureRegressionLesson } from "./regression-learning.js";
 
 function compactMemoryValue(value: unknown): string { try { const text = typeof value === "string" ? value : JSON.stringify(value); return text.slice(0, 9000); } catch { return String(value).slice(0, 9000); } }
 async function persistExecutionMemory(task: { id: string; tenantId: string; userId: string; projectId: string | null; title: string; goal: string }, input: { toolName: string; input?: unknown }, result: { ok: boolean; output?: unknown; error?: string; tool?: string }) {
@@ -11,14 +12,12 @@ async function persistExecutionMemory(task: { id: string; tenantId: string; user
 }
 async function captureLearning(task: { tenantId: string; userId: string; projectId: string | null; goal: string }, input: { toolName: string; input?: unknown }, result: { ok: boolean; output?: unknown; error?: string; tool?: string }, verification?: unknown) {
   const tool = result.tool ?? input.toolName;
-  await recordLearning({
-    tenantId: task.tenantId, userId: task.userId, projectId: task.projectId ?? undefined, query: task.goal,
-    kind: result.ok ? "SOLUTION" : "MISTAKE", solution: result.ok ? `Tool ${tool} succeeded. Result: ${compactMemoryValue(result.output)}` : undefined,
-    mistake: result.ok ? undefined : `Tool ${tool} failed: ${result.error ?? "Unknown failure"}`,
-    rootCause: result.ok ? undefined : "Execution failure; root cause requires subsequent analysis",
-    verification: compactMemoryValue(verification ?? (result.ok ? result.output : result.error)), verified: result.ok,
-    confidence: result.ok ? 0.9 : 0.35
-  }).catch(() => undefined);
+  await recordLearning({ tenantId: task.tenantId, userId: task.userId, projectId: task.projectId ?? undefined, query: task.goal, kind: result.ok ? "SOLUTION" : "MISTAKE", solution: result.ok ? `Tool ${tool} succeeded. Result: ${compactMemoryValue(result.output)}` : undefined, mistake: result.ok ? undefined : `Tool ${tool} failed: ${result.error ?? "Unknown failure"}`, rootCause: result.ok ? undefined : "Execution failure; root cause requires subsequent analysis", verification: compactMemoryValue(verification ?? (result.ok ? result.output : result.error)), verified: result.ok, confidence: result.ok ? 0.9 : 0.35 }).catch(() => undefined);
+}
+async function captureRegressionIfRecovered(task: { id: string; tenantId: string; userId: string; projectId: string | null; goal: string }, stepId: string, input: { toolName: string; input?: unknown; previousFailureLessons?: unknown }, result: { ok: boolean; output?: unknown; error?: string; tool?: string }, verification?: unknown) {
+  if (!result.ok || !Array.isArray(input.previousFailureLessons) || input.previousFailureLessons.length === 0) return;
+  const lessons = input.previousFailureLessons.slice(0, 3).map((lesson: unknown) => { const item = lesson && typeof lesson === "object" ? lesson as Record<string, unknown> : {}; return `mistake=${String(item.mistake ?? "unknown")}; rootCause=${String(item.rootCause ?? "unknown")}`; }).join("\n");
+  await captureRegressionLesson({ taskId: task.id, stepId, tenantId: task.tenantId, userId: task.userId, projectId: task.projectId, goal: task.goal, failure: lessons, correction: `Recovered with tool ${result.tool ?? input.toolName}: ${compactMemoryValue(result.output)}`, verification: compactMemoryValue(verification ?? result.output) }).catch(() => undefined);
 }
 function evidenceObject(output: unknown): Record<string, unknown> | undefined { if (!output || typeof output !== "object") return undefined; const evidence = (output as Record<string, unknown>).evidence; return evidence && typeof evidence === "object" ? evidence as Record<string, unknown> : undefined; }
 function verifiedGitHubWrite(toolName: string, output: unknown): boolean { if (!["github.commit", "github.push"].includes(toolName)) return true; return evidenceObject(output)?.verified === true; }
@@ -40,13 +39,13 @@ export async function executeNextTaskStep(taskId: string, userId: string, tenant
   if (claimed.count !== 1) return { status: "RUNNING", reason: "STEP_ALREADY_CLAIMED", stepId: pending.id };
   const step = pending;
   if (step.name !== "TOOL") { await db.taskStep.update({ where: { id: step.id }, data: { status: "COMPLETED", completedAt: new Date(), output: { acknowledged: true } } }); return { status: "COMPLETED", stepId: step.id, next: true }; }
-  const input = (step.input ?? {}) as { toolName?: string; input?: unknown; approvalGranted?: boolean };
+  const input = (step.input ?? {}) as { toolName?: string; input?: unknown; approvalGranted?: boolean; previousFailureLessons?: unknown[] };
   if (!input.toolName) { await db.taskStep.update({ where: { id: step.id }, data: { status: "FAILED", error: "Tool step is missing toolName", completedAt: new Date() } }); return { status: "FAILED", stepId: step.id, error: "Tool step is missing toolName" }; }
   const result = await executeTool({ toolName: input.toolName, input: input.input, tenantId: task.tenantId, role, mode: task.autonomyMode, approvalGranted: input.approvalGranted === true });
   if (result.ok) {
     const verified = verifiedGitHubWrite(input.toolName, result.output) && verifiedCI(input.toolName, result.output);
     if (!verified) { const reason = input.toolName === "github.ci_status" ? "CI did not reach SUCCESS" : "Repository write completed without verified read-back evidence"; const verification = verificationSummary(input.toolName, result.output); await db.taskStep.update({ where: { id: step.id }, data: { status: "FAILED", error: reason, completedAt: new Date(), output: { result: result.output, verification } } }); await db.task.update({ where: { id: task.id }, data: { status: "FAILED" } }); await persistExecutionMemory(task, input as { toolName: string; input?: unknown }, { ok: false, tool: input.toolName, error: reason }); await captureLearning(task, input as { toolName: string; input?: unknown }, { ok: false, tool: input.toolName, error: reason }, verification); return { status: "FAILED", stepId: step.id, tool: input.toolName, error: reason, verification }; }
-    const verification = verificationSummary(input.toolName, result.output); await db.taskStep.update({ where: { id: step.id }, data: { status: "COMPLETED", output: { result: result.output, verification }, completedAt: new Date() } }); await persistExecutionMemory(task, input as { toolName: string; input?: unknown }, result); await captureLearning(task, input as { toolName: string; input?: unknown }, result, verification); return { status: "COMPLETED", stepId: step.id, tool: result.tool, output: result.output, verification };
+    const verification = verificationSummary(input.toolName, result.output); await db.taskStep.update({ where: { id: step.id }, data: { status: "COMPLETED", output: { result: result.output, verification }, completedAt: new Date() } }); await persistExecutionMemory(task, input as { toolName: string; input?: unknown }, result); await captureLearning(task, input as { toolName: string; input?: unknown }, result, verification); await captureRegressionIfRecovered(task, step.id, input, result, verification); return { status: "COMPLETED", stepId: step.id, tool: result.tool, output: result.output, verification };
   }
   if (result.requiresApproval) { await db.taskStep.update({ where: { id: step.id }, data: { status: "PENDING", startedAt: null } }); await db.task.update({ where: { id: task.id }, data: { status: "WAITING_APPROVAL" } }); return { status: "WAITING_APPROVAL", stepId: step.id, tool: result.tool, error: result.error }; }
   await db.taskStep.update({ where: { id: step.id }, data: { status: "FAILED", error: result.error, completedAt: new Date() } }); await db.task.update({ where: { id: task.id }, data: { status: "FAILED" } }); await persistExecutionMemory(task, input as { toolName: string; input?: unknown }, result); await captureLearning(task, input as { toolName: string; input?: unknown }, result); return { status: "FAILED", stepId: step.id, tool: result.tool, error: result.error };
