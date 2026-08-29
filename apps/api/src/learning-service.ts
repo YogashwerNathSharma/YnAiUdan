@@ -18,9 +18,7 @@ export async function recordLearning(input: { tenantId: string; userId: string; 
     const similar = existing.filter(row => lexicalScore(normalizedQuery, row.normalizedQuery) >= 0.80 && row.status === "VERIFIED");
     for (const row of similar) {
       const oldContent = contentOf(row); const newContent = `${input.solution ?? ""} ${input.correction ?? ""}`;
-      if (newContent.trim() && oldContent.trim() && lexicalScore(newContent, oldContent) < 0.35) {
-        await db.learningRecord.update({ where: { id: row.id }, data: { status: "SUPERSEDED", confidence: Math.min(row.confidence, 0.25) } });
-      }
+      if (newContent.trim() && oldContent.trim() && lexicalScore(newContent, oldContent) < 0.35) await db.learningRecord.update({ where: { id: row.id }, data: { status: "SUPERSEDED", confidence: Math.min(row.confidence, 0.25) } });
     }
   }
   return db.learningRecord.create({ data: { tenantId: input.tenantId, userId: input.userId, projectId: input.projectId, query: input.query.slice(0, 10000), normalizedQuery, kind: input.kind, status: input.verified ? "VERIFIED" : "CANDIDATE", solution: input.solution?.slice(0, 20000), mistake: input.mistake?.slice(0, 10000), rootCause: input.rootCause?.slice(0, 10000), correction: input.correction?.slice(0, 20000), verification: input.verification?.slice(0, 10000), confidence: clamp(input.confidence ?? (input.verified ? 0.9 : 0.5)) } });
@@ -30,17 +28,18 @@ export async function findLearning(query: string, context: { tenantId: string; u
   const normalized = normalizeQuery(query); if (!normalized) return [];
   const rows = await db.learningRecord.findMany({ where: { tenantId: context.tenantId, userId: context.userId, status: "VERIFIED", ...(context.excludeKinds?.length ? { kind: { notIn: context.excludeKinds } } : {}), OR: [{ projectId: context.projectId }, { projectId: null }] }, orderBy: [{ confidence: "desc" }, { successCount: "desc" }, { updatedAt: "desc" }], take: 100 });
   const now = Date.now();
-  return rows.map(row => { const lexical = lexicalScore(normalized, row.normalizedQuery); const projectBoost = context.projectId && row.projectId === context.projectId ? 0.15 : 0; const totalOutcomes = row.successCount + row.failureCount; const successRate = totalOutcomes > 0 ? row.successCount / totalOutcomes : 0.5; const ageDays = Math.max(0, (now - row.updatedAt.getTime()) / 86_400_000); const freshness = Math.exp(-ageDays / 180); const score = lexical * 0.50 + row.confidence * 0.25 + successRate * 0.15 + freshness * 0.10 + projectBoost; return { row, score }; }).filter(item => item.score >= 0.25).sort((a, b) => b.score - a.score).slice(0, Math.min(context.limit ?? 5, 10)).map(item => item.row);
+  return rows.map(row => { const lexical = lexicalScore(normalized, row.normalizedQuery); const projectBoost = context.projectId && row.projectId === context.projectId ? 0.15 : 0; const totalOutcomes = row.successCount + row.failureCount; const successRate = totalOutcomes > 0 ? row.successCount / totalOutcomes : 0.5; const ageDays = Math.max(0, (now - row.updatedAt.getTime()) / 86_400_000); const freshness = Math.exp(-ageDays / 180); const reliability = totalOutcomes >= 3 ? successRate : 0.5; const score = lexical * 0.48 + row.confidence * 0.22 + reliability * 0.18 + freshness * 0.12 + projectBoost; return { row, score }; }).filter(item => item.score >= 0.25).sort((a, b) => b.score - a.score).slice(0, Math.min(context.limit ?? 5, 10)).map(item => item.row);
 }
 
 export async function findFailureLessons(query: string, context: { tenantId: string; userId: string; projectId?: string; limit?: number }) {
   const normalized = normalizeQuery(query); if (!normalized) return [];
-  const rows = await db.learningRecord.findMany({ where: { tenantId: context.tenantId, userId: context.userId, kind: "MISTAKE", OR: [{ projectId: context.projectId }, { projectId: null }] }, orderBy: [{ updatedAt: "desc" }], take: 100 });
+  const rows = await db.learningRecord.findMany({ where: { tenantId: context.tenantId, userId: context.userId, kind: "MISTAKE", status: { in: ["CANDIDATE", "VERIFIED"] }, OR: [{ projectId: context.projectId }, { projectId: null }] }, orderBy: [{ updatedAt: "desc" }], take: 100 });
   return rows.map(row => { const lexical = Math.max(lexicalScore(normalized, row.normalizedQuery), lexicalScore(normalized, `${row.mistake ?? ""} ${row.rootCause ?? ""}`)); return { row, score: lexical }; }).filter(x => x.score >= 0.2).sort((a, b) => b.score - a.score).slice(0, context.limit ?? 5).map(x => x.row);
 }
 
 export async function markLearningOutcome(input: { id: string; tenantId: string; userId: string; success: boolean; verification?: string }) {
   const existing = await db.learningRecord.findFirst({ where: { id: input.id, tenantId: input.tenantId, userId: input.userId } }); if (!existing) throw new Error("Learning record not found");
-  const total = existing.successCount + existing.failureCount + 1; const successCount = existing.successCount + (input.success ? 1 : 0); const failureCount = existing.failureCount + (input.success ? 0 : 1); const confidence = clamp((existing.confidence * 0.7) + ((successCount / total) * 0.3));
-  return db.learningRecord.update({ where: { id: existing.id }, data: { successCount, failureCount, confidence, ...(input.verification ? { verification: input.verification.slice(0, 10000) } : {}) } });
+  const total = existing.successCount + existing.failureCount + 1; const successCount = existing.successCount + (input.success ? 1 : 0); const failureCount = existing.failureCount + (input.success ? 0 : 1); const baseConfidence = clamp((existing.confidence * 0.7) + ((successCount / total) * 0.3)); const successRate = successCount / total;
+  const status = total >= 3 && successRate < 0.34 ? "REJECTED" : undefined; const confidence = status ? clamp(baseConfidence * 0.45) : total >= 3 && successRate < 0.60 ? clamp(baseConfidence * 0.70) : baseConfidence;
+  return db.learningRecord.update({ where: { id: existing.id }, data: { successCount, failureCount, confidence, ...(status ? { status } : {}), ...(input.verification ? { verification: input.verification.slice(0, 10000) } : {}) } });
 }
