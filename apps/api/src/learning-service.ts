@@ -40,6 +40,13 @@ export async function findFailureLessons(query: string, context: { tenantId: str
   return rows.map(row => { const lexical = Math.max(lexicalScore(normalized, row.normalizedQuery), lexicalScore(normalized, `${row.mistake ?? ""} ${row.rootCause ?? ""}`)); return { row, score: lexical }; }).filter(x => x.score >= 0.2).sort((a, b) => b.score - a.score).slice(0, context.limit ?? 5).map(x => x.row);
 }
 
+export async function promoteVerifiedTaskLearning(input: { tenantId: string; userId: string; projectId?: string | null; goal: string; verification: string }) {
+  const normalized = normalizeQuery(input.goal); if (!normalized) return [];
+  const candidates = await db.learningRecord.findMany({ where: { tenantId: input.tenantId, userId: input.userId, projectId: input.projectId ?? undefined, kind: { in: ["SOLUTION", "PATTERN", "CORRECTION"] }, status: "CANDIDATE" }, orderBy: { updatedAt: "desc" }, take: 20 });
+  const matched = candidates.filter(row => lexicalScore(normalized, row.normalizedQuery) >= 0.35).slice(0, 5);
+  return Promise.all(matched.map(row => db.learningRecord.update({ where: { id: row.id }, data: { status: "VERIFIED", confidence: clamp(Math.max(row.confidence, 0.85)), verification: input.verification.slice(0, 10000), successCount: { increment: 1 } } })));
+}
+
 export async function markLearningOutcome(input: { id: string; tenantId: string; userId: string; success: boolean; verification?: string }) {
   const existing = await db.learningRecord.findFirst({ where: { id: input.id, tenantId: input.tenantId, userId: input.userId } }); if (!existing) throw new Error("Learning record not found");
   const total = existing.successCount + existing.failureCount + 1;
