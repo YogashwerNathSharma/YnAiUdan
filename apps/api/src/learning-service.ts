@@ -11,7 +11,8 @@ export async function recordLearning(input: { tenantId: string; userId: string; 
   const existing = await db.learningRecord.findMany({ where: { tenantId: input.tenantId, userId: input.userId, projectId: input.projectId, kind: input.kind, status: { in: ["CANDIDATE", "VERIFIED"] } }, orderBy: { updatedAt: "desc" }, take: 50 });
   const duplicate = existing.find(row => lexicalScore(normalizedQuery, row.normalizedQuery) >= 0.92 && lexicalScore(row.normalizedQuery, normalizedQuery) >= 0.92);
   if (duplicate) {
-    const successCount = duplicate.successCount + (input.verified ? 1 : 0); const confidence = clamp(Math.max(duplicate.confidence, input.confidence ?? 0.5));
+    const successCount = duplicate.successCount + (input.verified ? 1 : 0);
+    const confidence = clamp(Math.max(duplicate.confidence, input.confidence ?? 0.5));
     return db.learningRecord.update({ where: { id: duplicate.id }, data: { status: input.verified ? "VERIFIED" : duplicate.status, solution: input.solution?.slice(0, 20000) ?? duplicate.solution, mistake: input.mistake?.slice(0, 10000) ?? duplicate.mistake, rootCause: input.rootCause?.slice(0, 10000) ?? duplicate.rootCause, correction: input.correction?.slice(0, 20000) ?? duplicate.correction, verification: input.verification?.slice(0, 10000) ?? duplicate.verification, confidence, successCount } });
   }
   if (input.verified && ["SOLUTION", "CORRECTION", "PATTERN", "PREFERENCE"].includes(input.kind)) {
@@ -39,8 +40,13 @@ export async function findFailureLessons(query: string, context: { tenantId: str
 
 export async function markLearningOutcome(input: { id: string; tenantId: string; userId: string; success: boolean; verification?: string }) {
   const existing = await db.learningRecord.findFirst({ where: { id: input.id, tenantId: input.tenantId, userId: input.userId } }); if (!existing) throw new Error("Learning record not found");
-  const total = existing.successCount + existing.failureCount + 1; const successCount = existing.successCount + (input.success ? 1 : 0); const failureCount = existing.failureCount + (input.success ? 0 : 1); const baseConfidence = clamp((existing.confidence * 0.7) + ((successCount / total) * 0.3)); const successRate = successCount / total;
-  if (total >= 3 && successRate < 0.34) return db.learningRecord.update({ where: { id: existing.id }, data: { successCount, failureCount, confidence: clamp(baseConfidence * 0.45), status: "REJECTED", ...(input.verification ? { verification: input.verification.slice(0, 10000) } : {}) } });
+  const total = existing.successCount + existing.failureCount + 1;
+  const successCount = existing.successCount + (input.success ? 1 : 0);
+  const failureCount = existing.failureCount + (input.success ? 0 : 1);
+  const baseConfidence = clamp((existing.confidence * 0.7) + ((successCount / total) * 0.3));
+  const successRate = successCount / total;
+  const verification = input.verification?.slice(0, 10000);
+  if (total >= 3 && successRate < 0.34) return db.learningRecord.update({ where: { id: existing.id }, data: { successCount, failureCount, confidence: clamp(baseConfidence * 0.45), status: "REJECTED", ...(verification ? { verification } : {}) } });
   const confidence = total >= 3 && successRate < 0.60 ? clamp(baseConfidence * 0.70) : baseConfidence;
-  return db.learningRecord.update({ where: { id: existing.id }, data: { successCount, failureCount, confidence, ...(input.verification ? { verification: input.verification.slice(0, 10000) } : {}) } });
+  return db.learningRecord.update({ where: { id: existing.id }, data: { successCount, failureCount, confidence, status: input.success ? "VERIFIED" : existing.status, ...(verification ? { verification } : {}) } });
 }
