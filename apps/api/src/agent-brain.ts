@@ -2,11 +2,13 @@ import { createHash } from "node:crypto";
 import { db } from "./db.js";
 import { executeNextTaskStep } from "./task-executor.js";
 import { planToolSteps } from "./tool-planner.js";
+import { evaluateAgentRun } from "./agent-evaluation.js";
 
 export type BrainRunOptions = { userId: string; tenantId: string; role: string; maxCycles?: number; replanOnFailure?: boolean };
 function diagnosticFromResult(result: unknown): string | undefined { if (!result || typeof result !== "object") return undefined; const value = result as Record<string, unknown>; const error = typeof value.error === "string" ? value.error : undefined; const evidence = value.evidence && typeof value.evidence === "object" ? JSON.stringify(value.evidence) : undefined; const output = typeof value.output === "string" ? value.output : undefined; const combined = [error, evidence, output].filter(Boolean).join("\n"); return combined ? combined.slice(0, 30_000) : undefined; }
 function failureFingerprint(result: unknown): string | undefined { const diagnostic = diagnosticFromResult(result); if (!diagnostic) return undefined; return createHash("sha256").update(diagnostic.replace(/\b[0-9a-f]{7,64}\b/gi, "SHA").replace(/\b\d+\b/g, "N").trim().toLowerCase()).digest("hex"); }
 function strategyHints(result: unknown): string | undefined { if (!result || typeof result !== "object") return undefined; const value = result as Record<string, unknown>; const raw = value.recommendedStrategies; if (!Array.isArray(raw)) return undefined; const hints = raw.slice(0, 5).map(item => { if (!item || typeof item !== "object") return null; const row = item as Record<string, unknown>; return typeof row.strategy === "string" ? row.strategy : null; }).filter(Boolean); return hints.length ? hints.join("\n") : undefined; }
+function completedEvidenceCount(task: { steps: Array<{ status: string; output?: unknown }> }): number { return task.steps.filter(step => { const output = step.output; return Boolean(output && typeof output === "object" && ((output as Record<string, unknown>).verification || (output as Record<string, unknown>).result)); }).length; }
 
 export async function runAgentBrain(taskId: string, options: BrainRunOptions) {
   const maxCycles = Math.min(100, Math.max(1, options.maxCycles ?? 20)); const events: Array<Record<string, unknown>> = []; let replans = 0; let diagnosticEvidence: string | undefined; let recoveryStrategyHints: string | undefined; const failureFingerprints = new Set<string>();
@@ -19,9 +21,13 @@ export async function runAgentBrain(taskId: string, options: BrainRunOptions) {
       await db.taskStep.deleteMany({ where: { taskId: task.id } }); await db.taskStep.createMany({ data: steps.map((step, index) => ({ taskId: task.id, sequence: index + 1, name: "TOOL", status: "PENDING" as const, input: { toolName: step.tool, input: step.input, reason: step.reason, planningCycle: cycle, priorFailureCount: failureFingerprints.size } })) }); await db.task.update({ where: { id: task.id }, data: { status: "WAITING_APPROVAL" } });
       events.push({ cycle, phase: "PLAN", steps: steps.length, approvalRequired: true, usedDiagnosticEvidence: Boolean(planningEvidence), usedRecoveryStrategies: Boolean(recoveryStrategyHints), distinctFailureCount: failureFingerprints.size }); return { status: "WAITING_APPROVAL", cycles: cycle, events };
     }
-    if (["WAITING_APPROVAL", "PAUSED", "COMPLETED", "CANCELLED"].includes(task.status)) return { status: task.status, cycles: cycle - 1, events }; if (task.status !== "RUNNING") return { status: task.status, cycles: cycle - 1, events };
+    if (["WAITING_APPROVAL", "PAUSED", "CANCELLED"].includes(task.status)) return { status: task.status, cycles: cycle - 1, events }; if (task.status !== "RUNNING") return { status: task.status, cycles: cycle - 1, events };
     const result = await executeNextTaskStep(task.id, options.userId, options.tenantId, options.role); events.push({ cycle, phase: "EXECUTE", result });
-    if (["WAITING_APPROVAL", "PAUSED", "COMPLETED"].includes(result.status)) return { status: result.status, cycles: cycle, events };
+    if (["WAITING_APPROVAL", "PAUSED", "CANCELLED"].includes(result.status)) return { status: result.status, cycles: cycle, events };
+    if (result.status === "COMPLETED") {
+      const refreshed = await db.task.findFirst({ where: { id: task.id, userId: options.userId, tenantId: options.tenantId }, include: { steps: { orderBy: { sequence: "asc" } } } });
+      if (refreshed?.status === "COMPLETED") { const evaluation = evaluateAgentRun({ goal: refreshed.goal, completed: true, verified: Boolean((result as Record<string, unknown>).verification && ((result as Record<string, unknown>).verification as Record<string, unknown>).verified !== false), recoveryCount: replans, repeatedFailure: false, toolErrors: events.filter(event => event.phase === "EXECUTE" && (event.result as Record<string, unknown> | undefined)?.status === "FAILED").length, evidenceCount: completedEvidenceCount(refreshed) }); events.push({ cycle, phase: "EVALUATE", evaluation }); return { status: "COMPLETED", cycles: cycle, events, evaluation }; }
+    }
     if (result.status === "FAILED") {
       diagnosticEvidence = diagnosticFromResult(result); recoveryStrategyHints = strategyHints(result);
       const fingerprint = failureFingerprint(result);
