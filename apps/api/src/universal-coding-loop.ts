@@ -10,6 +10,7 @@ export type CodingLoopInput = {
   language?: string;
   workspaceContext?: string;
   maxAttempts?: number;
+  approvalGranted?: boolean;
 };
 
 export type CodingLoopAttempt = {
@@ -39,9 +40,9 @@ function extractFiles(text: string): Array<{ path: string; content: string }> {
   const files: Array<{ path: string; content: string }> = [];
   const pattern = /FILE:\s*([^\n]+)\n```[^\n]*\n([\s\S]*?)\n```/g;
   for (const match of text.matchAll(pattern)) {
-    const path = match[1]?.trim();
+    const filePath = match[1]?.trim();
     const content = match[2] ?? "";
-    if (path) files.push({ path, content });
+    if (filePath) files.push({ path: filePath, content });
   }
   return files;
 }
@@ -71,6 +72,7 @@ async function askModel(input: CodingLoopInput, diagnostic?: string): Promise<st
 
 async function writeFiles(input: CodingLoopInput, generated: string): Promise<string[]> {
   const files = extractFiles(generated);
+  if (!files.length) throw new Error("Model did not return any workspace files");
   const evidence: string[] = [];
   for (const file of files) {
     const result = await executeTool({
@@ -79,7 +81,7 @@ async function writeFiles(input: CodingLoopInput, generated: string): Promise<st
       tenantId: input.tenantId,
       role: input.role,
       mode: input.mode ?? "ASK_BEFORE_TOOLS",
-      approvalGranted: true,
+      approvalGranted: input.approvalGranted === true,
     });
     if (!result.ok) throw new Error(`workspace.write failed for ${file.path}: ${result.error}`);
     evidence.push(`wrote:${file.path}`);
@@ -107,7 +109,7 @@ export async function runUniversalCodingLoop(input: CodingLoopInput): Promise<Co
         tenantId: input.tenantId,
         role: input.role,
         mode: input.mode ?? "ASK_BEFORE_TOOLS",
-        approvalGranted: true,
+        approvalGranted: input.approvalGranted === true,
       });
       attemptRecord.execution = execution;
       if (!execution.ok) {
@@ -118,6 +120,7 @@ export async function runUniversalCodingLoop(input: CodingLoopInput): Promise<Co
         attemptRecord.verification = verification;
         evidence.push(`verification:${verification.score}%`);
         if (verification.verified) {
+          attempts.push(attemptRecord);
           return { success: true, attempts, summary: `Verified after ${attempt} attempt(s).`, evidence };
         }
         diagnostic = verification.summary;
@@ -126,11 +129,11 @@ export async function runUniversalCodingLoop(input: CodingLoopInput): Promise<Co
       diagnostic = error instanceof Error ? error.message : "Coding loop failed";
     }
     const fingerprint = diagnostic.slice(0, 2000);
+    attempts.push(attemptRecord);
     if (fingerprint && fingerprint === previousFingerprint) {
-      return { success: false, attempts: [...attempts, attemptRecord], summary: "Stopped after a repeated failure diagnostic.", evidence };
+      return { success: false, attempts, summary: "Stopped after a repeated failure diagnostic.", evidence };
     }
     previousFingerprint = fingerprint;
-    attempts.push(attemptRecord);
   }
   return { success: false, attempts, summary: `Unable to verify the implementation after ${attempts.length} attempt(s).`, evidence };
 }
