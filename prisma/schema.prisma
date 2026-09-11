@@ -43,7 +43,7 @@ model User {
   @@index([tenantId])
 }
 model Project {
-  id String @id @map("_id")
+  id String @id @default(auto()) @map("_id")
   tenantId String @db.ObjectId
   name String
   slug String
