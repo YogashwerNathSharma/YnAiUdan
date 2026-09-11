@@ -2,7 +2,7 @@ import path from "node:path";
 
 export type SandboxProfile = {
   isolationLevel: "workspace-process";
-  networkAccess: "disabled-by-policy";
+  networkAccess: "runtime-enforced" | "host-process-inherited";
   maxWallTimeMs: number;
   maxOutputBytes: number;
   workspaceOnly: true;
@@ -11,7 +11,7 @@ export type SandboxProfile = {
 
 export const DEFAULT_SANDBOX_PROFILE: SandboxProfile = {
   isolationLevel: "workspace-process",
-  networkAccess: "disabled-by-policy",
+  networkAccess: "host-process-inherited",
   maxWallTimeMs: 120_000,
   maxOutputBytes: 200_000,
   workspaceOnly: true,
