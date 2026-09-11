@@ -46,7 +46,7 @@ model User {
 }
 
 model Project {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   tenantId String @db.ObjectId
   name String
   slug String
@@ -65,7 +65,7 @@ model Project {
 }
 
 model ProjectMember {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   projectId String @db.ObjectId
   userId String @db.ObjectId
   role ProjectRole @default(MEMBER)
@@ -76,7 +76,7 @@ model ProjectMember {
 }
 
 model Conversation {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   projectId String? @db.ObjectId
   userId String @db.ObjectId
   title String @default("New conversation")
@@ -90,7 +90,7 @@ model Conversation {
 }
 
 model Message {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   conversationId String @db.ObjectId
   role MessageRole
   content String
@@ -122,7 +122,7 @@ model Memory {
 }
 
 model LearningRecord {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   tenantId String @db.ObjectId
   userId String @db.ObjectId
   projectId String? @db.ObjectId
@@ -150,7 +150,7 @@ model LearningRecord {
 }
 
 model KnowledgeDocument {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   tenantId String @db.ObjectId
   userId String @db.ObjectId
   projectId String? @db.ObjectId
@@ -170,7 +170,7 @@ model KnowledgeDocument {
 }
 
 model KnowledgeChunk {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   chunkIndex Int
   content String
   embedding Json?
@@ -182,7 +182,7 @@ model KnowledgeChunk {
 }
 
 model Task {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   tenantId String @db.ObjectId
   userId String @db.ObjectId
   projectId String? @db.ObjectId
@@ -210,7 +210,7 @@ model Task {
 }
 
 model TaskStep {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   taskId String @db.ObjectId
   sequence Int?
   name String?
@@ -228,7 +228,7 @@ model TaskStep {
 }
 
 model TaskQueueJob {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   taskId String @db.ObjectId
   status QueueJobStatus @default(QUEUED)
   attempts Int @default(0)
@@ -245,7 +245,7 @@ model TaskQueueJob {
 }
 
 model TaskAuditEvent {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   taskId String @db.ObjectId
   tenantId String @db.ObjectId
   sequence Int
@@ -287,7 +287,7 @@ model Artifact {
 }
 
 model AiUsage {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   userId String @db.ObjectId
   tenantId String @db.ObjectId
   taskType String
@@ -295,7 +295,7 @@ model AiUsage {
   model String
   inputTokens Int @default(0)
   outputTokens Int @default(0)
-  latencyMs Int @default(0)
+  latencyMs Int
   success Boolean
   createdAt DateTime @default(now())
   error String?
