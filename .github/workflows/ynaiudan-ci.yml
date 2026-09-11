@@ -25,6 +25,8 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --filter @ynaiudan/api exec prisma generate
       - name: Typecheck
         run: pnpm typecheck
       - name: Test
