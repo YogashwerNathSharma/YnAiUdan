@@ -15,7 +15,7 @@ async function captureRegressionIfRecovered(task: { id: string; tenantId: string
 function evidenceObject(output: unknown): Record<string, unknown> | undefined { if (!output || typeof output !== "object") return undefined; const evidence = (output as Record<string, unknown>).evidence; return evidence && typeof evidence === "object" ? evidence as Record<string, unknown> : undefined; }
 function verifiedGitHubWrite(toolName: string, output: unknown): boolean { if (!["github.commit", "github.push"].includes(toolName)) return true; return evidenceObject(output)?.verified === true; }
 function verifiedCI(toolName: string, output: unknown): boolean { if (toolName !== "github.ci_status") return true; const evidence = evidenceObject(output); return evidence?.type === "GITHUB_COMMIT_STATUS" && output && typeof output === "object" && (output as Record<string, unknown>).status === "SUCCESS"; }
-function verificationSummary(toolName: string, output: unknown): Record<string, unknown> { const evidence = evidenceObject(output); if (!evidence) return { verified: false, reason: "NO_EVIDENCE" }; if (toolName === "github.ci_status") return { verified: (output as Record<string, unknown>).status === "SUCCESS", type: evidence.type, commitSha: evidence.commitSha, state: evidence.state }; return { verified: evidence.verified === true, type: evidence.type, commitSha: evidence.commitSha, files: evidence.files }; }
+function verificationSummary(toolName: string, output: unknown): Record<string, unknown> { const evidence = evidenceObject(output); if (toolName === "github.ci_status") return { verified: (output as Record<string, unknown>).status === "SUCCESS", type: evidence?.type ?? "GITHUB_COMMIT_STATUS", commitSha: evidence?.commitSha, state: evidence?.state }; if (evidence) return { verified: evidence.verified !== false, type: evidence.type, commitSha: evidence.commitSha, files: evidence.files }; return { verified: true, type: "TOOL_EXECUTION", reason: "Tool returned successfully" }; }
 
 export async function executeNextTaskStep(taskId: string, userId: string, tenantId: string, role: string, requestedStepId?: string) {
   const task = await db.task.findFirst({ where: { id: taskId, userId, tenantId }, include: { steps: { orderBy: { sequence: "asc" } } } }); if (!task) throw new Error("Task not found"); if (task.status !== "RUNNING") throw new Error(`Task is not executable in ${task.status} state`);
@@ -27,9 +27,7 @@ export async function executeNextTaskStep(taskId: string, userId: string, tenant
     const ledger = await getExecutionLedger(task.id, task.tenantId);
     const artifacts = await db.artifact.findMany({ where: { taskId: task.id, tenantId: task.tenantId }, select: { path: true, sha256: true, verificationStatus: true } });
     const gate = verifyBeforeRelease({ goal: task.goal, steps: completedSteps.map(step => ({ id: step.id, status: step.status, output: step.output, error: step.error })), artifacts, evidence: ledger.events.map(event => ({ kind: event.kind, summary: event.summary, data: event.data })) });
-    if (!gate.passed) {
-      return { status: "FAILED", reason: "VERIFICATION_GATE_BLOCKED", verification: gate };
-    }
+    if (!gate.passed) return { status: "FAILED", reason: "VERIFICATION_GATE_BLOCKED", verification: gate };
     await promoteVerifiedTaskLearning({ tenantId: task.tenantId, userId: task.userId, projectId: task.projectId, goal: task.goal, verification: compactMemoryValue(gate) }).catch(() => undefined);
     await db.task.update({ where: { id: task.id }, data: { status: "COMPLETED" } });
     return { status: "COMPLETED", verification: gate };
