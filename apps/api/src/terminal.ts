@@ -3,14 +3,15 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { toolRegistry } from "./tools.js";
+import { DEFAULT_SANDBOX_PROFILE, sandboxWorkspace, validateSandboxCommand } from "./sandbox-policy.js";
 
 const commandInput = z.object({
   command: z.string().trim().min(1).max(2000),
   tenantId: z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/),
-  timeoutMs: z.number().int().min(1000).max(120_000).default(120_000),
+  timeoutMs: z.number().int().min(1000).max(DEFAULT_SANDBOX_PROFILE.maxWallTimeMs).default(DEFAULT_SANDBOX_PROFILE.maxWallTimeMs),
 });
 
-const allowedCommands = new Set(["node", "npm", "pnpm", "npx", "git", "tsc", "python", "python3", "pytest", "go", "cargo", "rustc", "javac", "java", "dotnet", "swift", "ruby", "php", "composer", "gradle", "mvn"]);
+const allowedCommands = new Set(DEFAULT_SANDBOX_PROFILE.allowedExecutables);
 const blockedFragments = [
   /(^|\s)(rm|rmdir|del|format)(\s|$)/i,
   /(^|\s)(shutdown|reboot)(\s|$)/i,
@@ -23,10 +24,11 @@ const blockedFragments = [
 const workspaceBase = path.resolve(process.env.WORKSPACE_ROOT ?? path.join(process.cwd(), ".ynaiudan-workspaces"));
 
 function tenantRoot(tenantId: string): string {
-  return path.resolve(workspaceBase, tenantId);
+  return sandboxWorkspace(workspaceBase, tenantId);
 }
 
 function parseCommand(command: string): { executable: string; args: string[] } {
+  validateSandboxCommand(command);
   if (blockedFragments.some(pattern => pattern.test(command))) throw new Error("Command contains a blocked operation");
   const parts = command.match(/(?:[^\s"]+|"[^"]*")+/g)?.map(part => part.replace(/^"|"$/g, "")) ?? [];
   if (!parts.length || !allowedCommands.has(path.basename(parts[0]))) throw new Error("Command is not allowlisted");
@@ -41,11 +43,11 @@ export function registerTerminalTool(): void {
   if (toolRegistry.get("terminal.execute")) return;
   toolRegistry.register({
     name: "terminal.execute",
-    description: "Execute an allowlisted development command inside the tenant-isolated YnAiUdan workspace with bounded output and timeout.",
+    description: "Execute an allowlisted development command inside the tenant workspace under the universal sandbox policy.",
     inputSchema: commandInput,
     risk: "HIGH",
     permissions: ["TERMINAL_EXECUTE"],
-    timeoutMs: 120_000,
+    timeoutMs: DEFAULT_SANDBOX_PROFILE.maxWallTimeMs,
     execute: async ({ command, tenantId, timeoutMs }) => {
       const { executable, args } = parseCommand(command);
       if (args.some(arg => !isSafeArgument(arg))) throw new Error("Command argument is outside the workspace-safe policy");
@@ -62,11 +64,11 @@ export function registerTerminalTool(): void {
         let stdout = "";
         let stderr = "";
         const finish = (value: unknown) => { if (!settled) { settled = true; resolve(value); } };
-        const timer = setTimeout(() => { child.kill(); finish({ exitCode: 124, stdout: stdout.slice(0, 200_000), stderr: `${stderr.slice(0, 190_000)}\nExecution timed out.`, tenantId, cwd, timedOut: true }); }, timeoutMs);
-        child.stdout.on("data", data => { stdout += data.toString(); if (stdout.length > 200_000) child.kill(); });
-        child.stderr.on("data", data => { stderr += data.toString(); if (stderr.length > 200_000) child.kill(); });
+        const timer = setTimeout(() => { child.kill(); finish({ exitCode: 124, stdout: stdout.slice(0, DEFAULT_SANDBOX_PROFILE.maxOutputBytes), stderr: `${stderr.slice(0, DEFAULT_SANDBOX_PROFILE.maxOutputBytes - 20)}\nExecution timed out.`, tenantId, cwd, timedOut: true }); }, timeoutMs);
+        child.stdout.on("data", data => { stdout += data.toString(); if (stdout.length > DEFAULT_SANDBOX_PROFILE.maxOutputBytes) child.kill(); });
+        child.stderr.on("data", data => { stderr += data.toString(); if (stderr.length > DEFAULT_SANDBOX_PROFILE.maxOutputBytes) child.kill(); });
         child.on("error", error => { clearTimeout(timer); if (!settled) { settled = true; reject(error); } });
-        child.on("close", code => { clearTimeout(timer); finish({ exitCode: code ?? 1, stdout: stdout.slice(0, 200_000), stderr: stderr.slice(0, 200_000), tenantId, cwd, timedOut: false }); });
+        child.on("close", code => { clearTimeout(timer); finish({ exitCode: code ?? 1, stdout: stdout.slice(0, DEFAULT_SANDBOX_PROFILE.maxOutputBytes), stderr: stderr.slice(0, DEFAULT_SANDBOX_PROFILE.maxOutputBytes), tenantId, cwd, timedOut: false }); });
       });
     },
   });
