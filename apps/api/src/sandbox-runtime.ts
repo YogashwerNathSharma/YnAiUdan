@@ -84,7 +84,7 @@ function containerArgs(input: SandboxExecutionInput): string[] {
     "--memory=512m",
     "--cpus=1",
     "--tmpfs=/tmp:rw,nosuid,nodev,noexec,size=64m",
-    "--mount", `type=bind,src=${workspace},dst=${relativeWorkdir},readonly=false",
+    "--mount", `type=bind,src=${workspace},dst=${relativeWorkdir},readonly=false`,
     "--workdir", relativeWorkdir,
     "--user", "10001:10001",
     sandboxImage,
