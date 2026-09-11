@@ -26,6 +26,11 @@ function unique(values: string[]): string[] {
   return [...new Set(values)];
 }
 
+function containsLanguage(goal: string, language: string): boolean {
+  const escaped = language.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, "i").test(goal);
+}
+
 export function detectUniversalIntent(goal: string, platform = "GENERAL"): UniversalIntent {
   const text = `${goal} ${platform}`.toLowerCase();
   const modalities: UniversalModality[] = ["TEXT"];
@@ -41,7 +46,7 @@ export function detectUniversalIntent(goal: string, platform = "GENERAL"): Unive
   if (/computer|desktop|click|ui automation|terminal/.test(text)) modalities.push("COMPUTER");
 
   for (const language of UNIVERSAL_PROGRAMMING_LANGUAGES) {
-    if (new RegExp(`\\b${language.replace(/[+#]/g, "\\$&")}\\b`, "i").test(goal)) languages.push(language);
+    if (containsLanguage(goal, language)) languages.push(language);
   }
 
   return { goal, modalities: unique(modalities) as UniversalModality[], languages, platform };
