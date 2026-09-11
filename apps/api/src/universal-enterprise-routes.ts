@@ -9,7 +9,7 @@ export async function registerUniversalEnterpriseRoutes(app: FastifyInstance): P
     const auth = request.user as AuthPayload;
     const { id } = request.params as { id: string };
     try {
-      const ledger = getExecutionLedger(id, auth.tenantId);
+      const ledger = await getExecutionLedger(id, auth.tenantId);
       return reply.send({ ledger, integrity: verifyExecutionLedger(ledger) });
     } catch {
       return reply.code(404).send({ error: "Execution evidence not found" });
