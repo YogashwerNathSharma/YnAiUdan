@@ -101,7 +101,7 @@ model Message {
 }
 
 model Memory {
-  id String @id @default(auto()) @map("_id")
+  id String @id @default(auto()) @map("_id") @db.ObjectId
   tenantId String @db.ObjectId
   userId String @db.ObjectId
   projectId String? @db.ObjectId
@@ -306,15 +306,96 @@ model AiUsage {
   @@index([model,createdAt])
 }
 
-enum UserRole { OWNER ADMIN DEVELOPER USER AGENT }
-enum ProjectRole { OWNER EDITOR MEMBER VIEWER }
-enum MessageRole { USER ASSISTANT SYSTEM TOOL }
-enum MemoryType { CONVERSATION USER PROJECT TASK TOOL PREFERENCE }
-enum LearningKind { SOLUTION CORRECTION MISTAKE PATTERN PREFERENCE }
-enum LearningStatus { CANDIDATE VERIFIED REJECTED SUPERSEDED }
-enum KnowledgeStatus { PROCESSING READY FAILED }
-enum TaskStatus { QUEUED PLANNING RUNNING WAITING_APPROVAL PAUSED FAILED COMPLETED CANCELLED }
-enum StepStatus { PENDING RUNNING COMPLETED FAILED SKIPPED }
-enum TaskStepType { PLAN TOOL VALIDATION RESULT }
-enum AutonomyMode { CHAT_ONLY SUGGEST_ACTIONS ASK_BEFORE_TOOLS AUTO_SAFE AUTONOMOUS FULLY_CONTROLLED }
-enum QueueJobStatus { QUEUED RUNNING COMPLETED FAILED }
+enum UserRole {
+  OWNER
+  ADMIN
+  DEVELOPER
+  USER
+  AGENT
+}
+
+enum ProjectRole {
+  OWNER
+  EDITOR
+  MEMBER
+  VIEWER
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum MemoryType {
+  CONVERSATION
+  USER
+  PROJECT
+  TASK
+  TOOL
+  PREFERENCE
+}
+
+enum LearningKind {
+  SOLUTION
+  CORRECTION
+  MISTAKE
+  PATTERN
+  PREFERENCE
+}
+
+enum LearningStatus {
+  CANDIDATE
+  VERIFIED
+  REJECTED
+  SUPERSEDED
+}
+
+enum KnowledgeStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum TaskStatus {
+  QUEUED
+  PLANNING
+  RUNNING
+  WAITING_APPROVAL
+  PAUSED
+  FAILED
+  COMPLETED
+  CANCELLED
+}
+
+enum StepStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum TaskStepType {
+  PLAN
+  TOOL
+  VALIDATION
+  RESULT
+}
+
+enum AutonomyMode {
+  CHAT_ONLY
+  SUGGEST_ACTIONS
+  ASK_BEFORE_TOOLS
+  AUTO_SAFE
+  AUTONOMOUS
+  FULLY_CONTROLLED
+}
+
+enum QueueJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
