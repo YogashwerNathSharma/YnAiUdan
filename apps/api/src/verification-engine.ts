@@ -18,14 +18,19 @@ export function verifyExecution(input: {
   stdout?: string;
   stderr?: string;
   requiredOutput?: string;
+  failOnStderr?: boolean;
 }): VerificationReport {
   const checks: VerificationCheck[] = [];
   const expectedExitCode = input.expectedExitCode ?? 0;
   const exitPassed = input.exitCode === expectedExitCode;
   checks.push({ name: "EXIT_CODE", passed: exitPassed, evidence: `expected=${expectedExitCode}, actual=${input.exitCode}` });
 
-  const hasErrorOutput = Boolean(input.stderr?.trim());
-  checks.push({ name: "STDERR", passed: !hasErrorOutput, evidence: hasErrorOutput ? input.stderr!.slice(0, 4000) : "No stderr output" });
+  const hasStderr = Boolean(input.stderr?.trim());
+  if (input.failOnStderr === true) {
+    checks.push({ name: "STDERR", passed: !hasStderr, evidence: hasStderr ? input.stderr!.slice(0, 4000) : "No stderr output" });
+  } else if (hasStderr) {
+    checks.push({ name: "STDERR", passed: true, evidence: `Non-fatal stderr: ${input.stderr!.slice(0, 4000)}` });
+  }
 
   if (input.requiredOutput !== undefined) {
     const output = `${input.stdout ?? ""}\n${input.stderr ?? ""}`;
@@ -35,10 +40,11 @@ export function verifyExecution(input: {
 
   const passed = checks.filter(check => check.passed).length;
   const score = checks.length ? Math.round((passed / checks.length) * 100) : 0;
+  const verified = checks.length > 0 && checks.every(check => check.passed);
   return {
-    verified: checks.length > 0 && checks.every(check => check.passed),
+    verified,
     score,
     checks,
-    summary: checks.every(check => check.passed) ? "Execution passed all verification checks." : `${checks.length - passed} verification check(s) failed.`,
+    summary: verified ? "Execution passed all verification checks." : `${checks.length - passed} verification check(s) failed.`,
   };
 }
