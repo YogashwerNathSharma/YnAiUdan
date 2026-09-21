@@ -14,6 +14,7 @@ test("builds a multi-target autonomous factory plan", () => {
   assert.ok(plan.targets.includes("API"));
   assert.ok(plan.targets.includes("DATABASE"));
   assert.ok(plan.targets.includes("IMAGE"));
+  assert.ok(plan.targets.includes("SOFTWARE_PROJECT"));
   assert.equal(plan.qualityGates.find(g => g.id === "verification")?.independent, true);
   assert.deepEqual(plan.waves[0], ["factory-architect"]);
   assert.deepEqual(plan.waves.at(-1), ["factory-verify"]);
