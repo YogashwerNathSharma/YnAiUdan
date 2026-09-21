@@ -5,7 +5,7 @@ import { routeCapabilityAgent } from "./capability-agent-router.js";
 
 export type DeliveryTarget =
   | "WEB_APP" | "ANDROID_APP" | "IOS_APP" | "API"
-  | "DESKTOP_APP" | "DATABASE" | "IMAGE" | "VIDEO" | "AUDIO"
+  | "DESKTOP_APP" | "SOFTWARE_PROJECT" | "COMPUTER_WORKFLOW" | "DATABASE" | "IMAGE" | "VIDEO" | "AUDIO"
   | "DOCUMENT" | "DATA_PRODUCT" | "DEPLOYMENT";
 
 export type FactoryPhase =
@@ -50,13 +50,17 @@ function targetFor(platform: string, modality: UniversalModality): DeliveryTarge
   if (p === "IOS") return "IOS_APP";
   if (p === "WEB") return "WEB_APP";
   if (p === "API") return "API";
+  if (p === "COMPUTER") return "COMPUTER_WORKFLOW";
   if (p === "IMAGE" || modality === "IMAGE") return "IMAGE";
   if (p === "VIDEO" || modality === "VIDEO") return "VIDEO";
   if (p === "AUDIO" || modality === "AUDIO") return "AUDIO";
   if (p === "DOCUMENT" || modality === "DOCUMENT") return "DOCUMENT";
   if (p === "DATA" || modality === "DATA") return "DATA_PRODUCT";
   if (p === "DATABASE") return "DATABASE";
-  return "WEB_APP";
+  if (modality === "CODE") return "SOFTWARE_PROJECT";
+  if (modality === "COMPUTER") return "COMPUTER_WORKFLOW";
+  if (modality === "WEB") return "WEB_APP";
+  return "SOFTWARE_PROJECT";
 }
 
 function acceptanceFor(agent: CapabilityAgent, target: DeliveryTarget): string[] {
@@ -66,6 +70,8 @@ function acceptanceFor(agent: CapabilityAgent, target: DeliveryTarget): string[]
   if (target === "ANDROID_APP" || target === "IOS_APP") return [...common, "App build/package completes", "Critical user flow is exercised"];
   if (target === "IMAGE" || target === "VIDEO" || target === "AUDIO") return [...common, "Media artifact is readable/playable", "Requested format and dimensions/duration are satisfied"];
   if (target === "DOCUMENT") return [...common, "Document opens successfully", "Required sections are present"];
+  if (target === "SOFTWARE_PROJECT") return [...common, "Build or runtime checks complete", "Relevant tests/checks pass"];
+  if (target === "COMPUTER_WORKFLOW") return [...common, "Workflow executes in the controlled environment", "Expected end state is observed"];
   return [...common, "Implementation executes successfully", "Relevant tests/checks pass"];
 }
 
