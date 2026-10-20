@@ -62,7 +62,7 @@ export function critiqueExecution(input: CriticInput): CriticResult {
     return { decision: "REJECT", score: Math.max(0, 100 - failedChecks.length * 20 - unverifiedArtifacts.length * 15), reasons, missingArtifacts, failedChecks };
   }
 
-  const score = Math.min(100, 70 + Math.min(20, artifacts.length * 5) + Math.min(10, evidenceCount));
+  const score = Math.min(100, 75 + Math.min(15, artifacts.length * 5) + Math.min(10, evidenceCount));
   reasons.push("Goal, required artifacts, verification, and evidence passed the deterministic critic");
   return { decision: "ACCEPT", score, reasons, missingArtifacts, failedChecks };
 }
