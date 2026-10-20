@@ -1,6 +1,7 @@
 import { toolRegistry } from "./tools.js";
 import { canRunTool, hasPermission, normalizeAutonomyMode, requiresApproval, type AutonomyMode } from "./permissions.js";
-import { validateAgentTool, type CapabilityAgent } from "./agent-fabric.js";
+import { validateAgentTool } from "./agent-fabric.js";
+import type { CapabilityAgent } from "./capability-agent-router.js";
 
 export type ToolExecutionResult = { ok: true; tool: string; output: unknown } | { ok: false; tool: string; error: string; requiresApproval?: boolean };
 
