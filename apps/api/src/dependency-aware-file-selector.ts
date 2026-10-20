@@ -3,7 +3,7 @@ import { selectRelevantFiles } from "./workspace-file-selector.js";
 
 export type DependencyCandidate = FileCandidate & { imports?: string[] };
 
-function normalize(path: string): string { return path.replace(/\\/g, "/").replace(/^\.\//, ""); }
+function normalize(value: string): string { const parts: string[] = []; for (const part of value.replace(/\\/g, "/").split("/")) { if (!part || part === ".") continue; if (part === "..") parts.pop(); else parts.push(part); } return parts.join("/"); }
 function resolveImport(from: string, imported: string): string | null {
   if (!imported.startsWith(".")) return null;
   const parts = normalize(from).split("/"); parts.pop();
