@@ -12,7 +12,7 @@ describe("context engine", () => {
       ],
       getFile: async (_repo: unknown, path: string, _ref: string) => ({ content: path === "src/login.ts" ? "import './auth'; login" : path === "src/auth.ts" ? "authentication" : "sales report" })
     } as any;
-    const result = await buildContextPackage({ client, repository: { owner: "o", name: "r" }, ref: "abcdef1", task: "fix login", tenantId: "t", userId: "u" });
+    const result = await buildContextPackage({ client, repository: { owner: "o", name: "r" }, ref: "abcdef1", task: "fix login", tenantId: "t", userId: "u", maxFiles: 2 });
     assert.deepEqual(result.selectedPaths, ["src/login.ts", "src/auth.ts"]);
     assert.equal(result.reference.commitSha, "abcdef1");
   });
