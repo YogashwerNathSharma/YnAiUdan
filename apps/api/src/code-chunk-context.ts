@@ -21,7 +21,7 @@ export function chunkSourceFile(path: string, content: string, maxLines = 80): C
     }
     const nameMatch = declarationLine.trim().match(DECLARATION);
     const name = nameMatch?.[1] ?? nameMatch?.[2] ?? "block";
-    chunks.push({ path, startLine: i + 1, endLine: end + 1, text: `${name}\n${lines.slice(i, end + 1).join("\n")}`, kind: /^class\b/.test(lines[i].trim()) ? "class" : "function" });
+    chunks.push({ path, startLine: i + 1, endLine: end + 1, text: `${name}\n${lines.slice(i, end + 1).join("\n")}`, kind: /^class\b/.test(declarationLine.trim()) ? "class" : "function" });
   }
   return chunks;
 }
