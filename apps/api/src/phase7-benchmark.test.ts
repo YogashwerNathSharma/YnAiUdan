@@ -15,7 +15,7 @@ describe("phase 7 autonomous coding benchmark", () => {
       maxAttempts: 2,
       repair: async () => {
         repairs += 1;
-        return [{ path: "src/target.ts", content: "export function target(): string { return 'fixed'; }" }];
+        return [{ path: "src/target.ts", operation: "update", content: "export function target(): string { return 'fixed'; }" }];
       }
     });
     assert.equal(result.status, "FIXED");
