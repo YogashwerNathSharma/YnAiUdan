@@ -15,6 +15,6 @@ describe("semantic context", () => {
   it("supports embedding-provider cosine ranking", async () => {
     const vectors: Record<string, number[]> = { query: [1, 0], auth: [1, 0], report: [0, 1] };
     const result = await semanticRank("query", [{ path: "auth.ts", text: "auth" }, { path: "report.ts", text: "report" }], { embed: async text => vectors[text] ?? [0, 0] });
-    assert.equal(result[0].path, "auth.ts");
+    assert.equal(result[0]?.path, "auth.ts");
   });
 });
