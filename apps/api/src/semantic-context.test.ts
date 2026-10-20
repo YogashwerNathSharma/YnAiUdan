@@ -8,8 +8,8 @@ describe("semantic context", () => {
       { path: "src/auth.ts", text: "authentication service" },
       { path: "src/report.ts", text: "sales report" }
     ]);
-    assert.equal(result[0].path, "src/auth.ts");
-    assert.ok(result[0].score > result[1].score);
+    assert.equal(result[0]?.path, "src/auth.ts");
+    assert.ok((result[0]?.score ?? 0) > (result[1]?.score ?? 0));
   });
 
   it("supports embedding-provider cosine ranking", async () => {
