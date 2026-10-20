@@ -43,4 +43,4 @@ export class MockProvider implements AIProvider { readonly name = "mock"; async 
 export const providerRegistry = new ProviderRegistry();
 providerRegistry.register(new MockProvider());
 if (process.env.OPENAI_API_KEY) providerRegistry.register(new OpenAIProvider());
-export function resolveProvider(model: string): AIProvider { const providerName = model.includes(":") ? model.split(":", 1)[0] : "openai"; if (providerName === "openai") { const provider = providerRegistry.get("openai"); if (!provider) throw new Error("OpenAI provider is unavailable: configure OPENAI_API_KEY"); return provider; } return providerRegistry.get(providerName) ?? providerRegistry.get("mock")!; }
+export function resolveProvider(model: string): AIProvider { const providerName = model.includes(":") ? model.split(":", 1)[0] : "openai"; const provider = providerRegistry.get(providerName); if (!provider) { if (providerName === "openai") throw new Error("OpenAI provider is unavailable: configure OPENAI_API_KEY"); throw new Error(`AI provider '${providerName}' is not registered`); } return provider; }
