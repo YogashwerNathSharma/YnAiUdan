@@ -21,7 +21,7 @@ describe("autonomous engineer benchmark", () => {
       maxAttempts: 2,
       repair: async () => {
         repairCalls += 1;
-        const change: WorkspaceChange = { path: "src/target.ts", content: "export function target() { return 'fixed'; }", reason: "deterministic benchmark repair" };
+        const change: WorkspaceChange = { path: "src/target.ts", operation: "update", content: "export function target() { return 'fixed'; }" };
         return [change];
       }
     });
