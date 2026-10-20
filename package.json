@@ -4,19 +4,13 @@
   "version": "0.1.0",
   "description": "YnAiUdan - production-grade multimodal AI agent platform",
   "packageManager": "pnpm@10.12.1",
-  "prisma": {
-    "schema": "prisma/schema.prisma"
-  },
   "scripts": {
     "dev": "pnpm --parallel --filter @ynaiudan/web --filter @ynaiudan/api dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "db:generate": "pnpm --filter @ynaiudan/api exec prisma generate",
-    "db:format": "pnpm --filter @ynaiudan/api exec prisma format",
-    "db:migrate": "pnpm --filter @ynaiudan/api exec prisma migrate dev"
-  },
-  "devDependencies": {
-    "prisma": "6.19.3"
+    "db:generate": "pnpm --filter @ynaiudan/api exec prisma generate --schema=../../prisma/schema.prisma",
+    "db:format": "pnpm --filter @ynaiudan/api exec prisma format --schema=../../prisma/schema.prisma",
+    "db:migrate": "pnpm --filter @ynaiudan/api exec prisma migrate dev --schema=../../prisma/schema.prisma"
   }
 }
