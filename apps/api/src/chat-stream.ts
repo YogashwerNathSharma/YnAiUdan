@@ -8,7 +8,7 @@ import { recordAIUsage } from "./ai-usage.js";
 
 type AuthPayload = { sub: string; tenantId: string };
 const schema = z.object({ conversationId: z.string().regex(/^[a-f0-9]{24}$/i), model: z.string().trim().min(1).max(100).optional(), message: z.string().trim().min(1).max(100_000) });
-const providerFromModel = (model: string) => model.includes(":") ? model.split(":", 1)[0] : "openai";
+const providerFromModel = (model: string) => model.includes(":") ? (model.split(":", 1)[0] ?? "openai") : "openai";
 
 export async function registerChatStreamRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/v1/chat/stream", { preHandler: authenticate }, async (request, reply) => {
