@@ -1,3 +1,11 @@
 packages:
   - apps/*
   - packages/*
+
+# pnpm 10 blocks dependency lifecycle scripts unless explicitly allowed.
+# Prisma needs these scripts so prisma generate can use the installed CLI/client.
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - esbuild
+  - prisma
