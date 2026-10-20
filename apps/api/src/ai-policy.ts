@@ -26,7 +26,7 @@ export function getAIPolicy(): AIPolicy {
 
 export function assertAIRequest(task: ModelTask, model: string, inputCharacters: number, requestedMaxTokens?: number): void {
   const policy = getAIPolicy();
-  const provider = model.includes(":") ? model.split(":", 1)[0] : "openai";
+  const provider = model.includes(":") ? (model.split(":", 1)[0] ?? "") : "openai";
   if (!policy.allowedProviders.includes(provider)) throw new Error(`AI provider '${provider}' is disabled by policy for ${task}`);
   if (!providerAvailable(model)) throw new Error(`AI provider '${provider}' is not configured`);
   if (inputCharacters > policy.maxInputCharacters) throw new Error(`AI input exceeds ${policy.maxInputCharacters} characters`);
