@@ -19,5 +19,5 @@ export function compileRequirements(projectId: string, rawRequirements: string[]
   const edges: ProjectGraphEdge[] = [];
   for (const req of requirements) for (const capability of req.capabilities) { const id = `${req.id}:cap:${capability.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50)}`; nodes.push({ id, type: "MODULE", label: capability }); edges.push({ from: id, to: req.id, type: "IMPLEMENTS" }); }
   const missingDecisions = requirements.filter(req => req.ambiguities.length).map(req => `${req.id}: ${req.ambiguities.join(", ")}`);
-  return { projectId, requirements, ...createProjectIntelligenceGraph(projectId, nodes, edges), missingDecisions };
+  return { ...createProjectIntelligenceGraph(projectId, nodes, edges), projectId, requirements, missingDecisions };
 }
