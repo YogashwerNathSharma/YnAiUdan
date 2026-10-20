@@ -17,7 +17,7 @@ describe("autonomous engineer benchmark", () => {
       workspace,
       role: "engineer",
       userId: "benchmark",
-      commands: ["test"],
+      commands: ["node -e \"process.exit(require('node:fs').readFileSync('src/target.ts','utf8').includes('fixed')?0:1)\""],
       maxAttempts: 2,
       repair: async () => {
         repairCalls += 1;
