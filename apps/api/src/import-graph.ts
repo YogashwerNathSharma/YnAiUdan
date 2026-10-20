@@ -16,7 +16,9 @@ export function buildImportGraph(files: Array<{ path: string; content: string }>
   for (const file of files) {
     let match: RegExpExecArray | null;
     while ((match = IMPORT_RE.exec(file.content)) !== null) {
-      const resolved = resolveLocal(file.path, match[2], fileSet);
+      const specifier = match[2];
+      if (!specifier) continue;
+      const resolved = resolveLocal(file.path, specifier, fileSet);
       if (resolved && resolved !== file.path && !nodes.get(file.path)!.imports.includes(resolved)) nodes.get(file.path)!.imports.push(resolved);
     }
     IMPORT_RE.lastIndex = 0;
