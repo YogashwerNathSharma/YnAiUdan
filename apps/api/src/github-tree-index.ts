@@ -1,5 +1,5 @@
 import type { GitHubClient, GitHubRepository } from "./github-agent.js";
-import type { FileCandidate } from "./workspace-file-selector.js";
+import type { DependencyCandidate } from "./dependency-aware-file-selector.js";
 import { selectDependencyAwareFiles } from "./dependency-aware-file-selector.js";
 
 export type RepositoryTreeEntry = { path: string; type?: "file" | "directory"; content?: string; imports?: string[] };
@@ -10,6 +10,6 @@ const SOURCE = /\.(ts|tsx|js|jsx|mjs|cjs|json|css|html)$/i;
 export async function indexRepositoryForTask(client: RepositoryTreeClient, repository: GitHubRepository, ref: string, task: string, maxFiles = 30) {
   if (!client.listTree) throw new Error("GitHub client does not support repository tree indexing");
   const tree = await client.listTree(repository, ref);
-  const candidates: FileCandidate[] = tree.filter(entry => entry.type !== "directory" && SOURCE.test(entry.path)).map(entry => ({ path: entry.path, content: entry.content ?? "" }));
+  const candidates: DependencyCandidate[] = tree.filter(entry => entry.type !== "directory" && SOURCE.test(entry.path)).map(entry => ({ path: entry.path, content: entry.content ?? "", imports: entry.imports ?? [] }));
   return selectDependencyAwareFiles(task, candidates, maxFiles);
 }
