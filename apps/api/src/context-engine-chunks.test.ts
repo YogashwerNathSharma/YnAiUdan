@@ -14,6 +14,6 @@ describe("context engine chunks", () => {
     const result = addRelevantChunks(context, "login", 1);
     assert.deepEqual(result.selectedPaths, context.selectedPaths);
     assert.equal(result.chunks.length, 1);
-    assert.match(result.chunks[0].text, /login/);
+    assert.match(result.chunks[0]?.text, /login/);
   });
 });
