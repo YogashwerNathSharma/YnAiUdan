@@ -50,7 +50,7 @@ export async function recordArtifact(input: ArtifactInput) {
       tool: input.tool,
       sourceStepId: input.sourceStepId,
       verificationStatus: input.verificationStatus ?? "UNVERIFIED",
-      provenance: input.provenance,
+      provenance: input.provenance as Prisma.InputJsonValue | undefined,
     },
   });
   await appendExecutionEvidence({
