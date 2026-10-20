@@ -1,4 +1,4 @@
-import type { GitHubClient, GitHubRepository, GitHubFileChange } from "./github-agent.js";
+import type { GitHubClient, GitHubRepository, GitHubFileChange, GitHubCIStatus } from "./github-agent.js";
 
 type GitHubResponse = { ok: boolean; status: number; data: any };
 export class GitHubHttpClient implements GitHubClient {
@@ -23,5 +23,5 @@ export class GitHubHttpClient implements GitHubClient {
     return { commitSha, branch, pushed: moveRef, changedFiles: changes.map(change => change.path) };
   }
   async createPullRequest(repo: GitHubRepository, title: string, head: string, base: string, body?: string): Promise<unknown> { return (await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/pulls`, { method: "POST", body: JSON.stringify({ title, head, base, body: body ?? "Created by YnAiUdan with explicit approval." }) })).data; }
-  async getCommitStatus(repo: GitHubRepository, sha: string): Promise<unknown> { return (await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/commits/${encodeURIComponent(sha)}/status`)).data; }
+  async getCommitStatus(repo: GitHubRepository, sha: string): Promise<GitHubCIStatus> { return (await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/commits/${encodeURIComponent(sha)}/status`)).data as GitHubCIStatus; }
 }
