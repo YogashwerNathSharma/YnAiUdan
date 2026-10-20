@@ -9,6 +9,6 @@ describe("orchestrated coder adapter", () => {
     const provider = { name: "test", chat: async () => ({ id: "test", model: "test", content: JSON.stringify({ summary: "updated", plan: ["edit"], patches: [{ path: "src/a.ts", operation: "update", content: "new" }] }) }) };
     const result = await generateCoderWorkspaceChanges(provider, { task: "update src/a.ts", workspace });
     assert.equal(result.summary, "updated");
-    assert.equal(result.changes[0]?.status, "modified");
+    assert.equal(result.changes[0]?.operation, "update");
   });
 });
