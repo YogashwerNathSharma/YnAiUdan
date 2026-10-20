@@ -29,19 +29,19 @@ test("critic requires repair for missing required artifact", () => {
 test("release gate blocks failed verification", () => {
   const result = verifyBeforeRelease({
     goal: "run tests",
-    steps: [{ id: "1", status: "COMPLETED", output: { verification: { verified: false } } }],
+    steps: [{ id: "1", status: "COMPLETED", output: { result: "failed", verification: { verified: false } } }],
     artifacts: [],
     evidence: [{ kind: "EXECUTION_FINISHED", summary: "tests finished" }],
   });
   assert.equal(result.passed, false);
-  assert.equal(result.critic.decision, "REJECT");
+  assert.equal(result.critic.decision, "REPAIR_REQUIRED");
 });
 
 test("release gate aggregates multiple successful steps", () => {
   const result = verifyBeforeRelease({
     goal: "run pipeline",
     steps: [
-      { id: "1", status: "COMPLETED", output: { verification: { verified: true } } },
+      { id: "1", status: "COMPLETED", output: { result: "ok", verification: { verified: true } } },
       { id: "2", status: "COMPLETED", output: { verification: { verified: true } } },
     ],
     artifacts: [{ path: "dist/app.js", sha256: "abc", verificationStatus: "VERIFIED" }],
