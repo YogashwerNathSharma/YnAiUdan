@@ -18,7 +18,7 @@ export function diagnoseFailure(input: string): DebugDiagnosis {
   if (/type error|ts\d{4}|is not assignable|property .* does not exist/.test(text)) {
     return diagnosis(true, "TYPE_ERROR", 0.85, "The CI output indicates a TypeScript type error that may be repaired in source code.");
   }
-  if (/test failed|assertion|failed.*test|tests?\s+failed|command failed|exit code|verification.*failed/.test(text)) {
+  if (/test failed|assertion|failed.*test|tests?\s+failed|command failed|exit code|exited with code|verification.*failed/.test(text)) {
     return diagnosis(true, "TEST_FAILURE", 0.8, "The CI output indicates a test failure that may be repaired in source code.");
   }
   if (/build failed|build.*error|compilation failed|compile failed/.test(text)) {
