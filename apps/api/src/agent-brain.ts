@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { db } from "./db.js";
 import { executeNextTaskStep } from "./task-executor.js";
 import { planToolSteps } from "./tool-planner.js";
@@ -33,7 +34,7 @@ export async function runAgentBrain(taskId: string, options: BrainRunOptions) {
       await appendExecutionEvidence({ taskId: task.id, tenantId: options.tenantId, kind: "PLAN_CREATED", actor: "AGENT", summary: `Planning cycle ${cycle} started`, data: { cycle, hasDiagnosticEvidence: Boolean(planningEvidence), hasRecoveryStrategies: Boolean(recoveryStrategyHints) } });
       const steps = await planToolSteps(task.goal, task.model ?? "mock:default", { userId: options.userId, tenantId: options.tenantId, projectId: task.projectId ?? undefined, diagnosticEvidence: planningEvidence }); if (steps.length > (task.maxSteps ?? 50)) throw new Error("Generated plan exceeds task step limit");
       if (steps.length === 0) { await db.task.update({ where: { id: task.id }, data: { status: "PAUSED" } }); await appendExecutionEvidence({ taskId: task.id, tenantId: options.tenantId, kind: "TASK_FAILED", actor: "AGENT", summary: "No safe execution plan was generated", data: { cycle, reason: "NO_SAFE_PLAN" } }); return { status: "PAUSED", reason: "NO_SAFE_PLAN", cycles: cycle, events }; }
-      await db.taskStep.deleteMany({ where: { taskId: task.id } }); await db.taskStep.createMany({ data: steps.map((step, index) => ({ taskId: task.id, sequence: index + 1, name: "TOOL", status: "PENDING" as const, input: { toolName: step.tool, input: step.input, reason: step.reason, parallelGroup: step.parallelGroup, dependsOn: step.dependsOn, planningCycle: cycle, priorFailureCount: failureFingerprints.size } })) }); await db.task.update({ where: { id: task.id }, data: { status: "WAITING_APPROVAL" } });
+      await db.taskStep.deleteMany({ where: { taskId: task.id } }); await db.taskStep.createMany({ data: steps.map((step, index) => ({ taskId: task.id, sequence: index + 1, name: "TOOL", status: "PENDING" as const, input: JSON.parse(JSON.stringify({ toolName: step.tool, input: step.input, reason: step.reason, parallelGroup: step.parallelGroup, dependsOn: step.dependsOn, planningCycle: cycle, priorFailureCount: failureFingerprints.size })) as Prisma.InputJsonObject })) }); await db.task.update({ where: { id: task.id }, data: { status: "WAITING_APPROVAL" } });
       events.push({ cycle, phase: "PLAN", steps: steps.length, approvalRequired: true, usedDiagnosticEvidence: Boolean(planningEvidence), usedRecoveryStrategies: Boolean(recoveryStrategyHints), distinctFailureCount: failureFingerprints.size }); return { status: "WAITING_APPROVAL", cycles: cycle, events };
     }
     if (["WAITING_APPROVAL", "PAUSED", "CANCELLED"].includes(task.status)) return { status: task.status, cycles: cycle - 1, events }; if (task.status !== "RUNNING") return { status: task.status, cycles: cycle - 1, events };

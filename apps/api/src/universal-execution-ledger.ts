@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { db } from "./db.js";
 
 export type ExecutionEventKind = "GOAL_ACCEPTED" | "PLAN_CREATED" | "AGENT_ASSIGNED" | "TOOL_REQUESTED" | "APPROVAL_REQUIRED" | "APPROVAL_GRANTED" | "EXECUTION_STARTED" | "EXECUTION_FINISHED" | "VERIFICATION_STARTED" | "VERIFICATION_FINISHED" | "REPAIR_STARTED" | "REPAIR_FINISHED" | "ARTIFACT_CREATED" | "TASK_COMPLETED" | "TASK_FAILED";
@@ -54,7 +55,7 @@ export async function appendExecutionEvidence(
       const saved = await db.taskAuditEvent.create({
         data: {
           id, taskId: input.taskId, tenantId: input.tenantId, sequence, kind: input.kind,
-          actor: input.actor, summary: input.summary, data: input.data ?? undefined,
+          actor: input.actor, summary: input.summary, data: input.data as Prisma.InputJsonValue | undefined,
           timestamp: new Date(timestamp), previousHash, integrityHash: candidate.integrityHash,
         },
       });

@@ -17,7 +17,7 @@ export const DEFAULT_SANDBOX_PROFILE: SandboxProfile = {
   workspaceOnly: true,
   allowedExecutables: [
     "node", "npm", "pnpm", "npx", "git", "tsc", "python", "python3", "pytest",
-    "go", "cargo", "rustc", "javac", "java", "dotnet", "swift", "ruby", "php", "composer", "gradle", "mvn",
+    "go", "cargo", "rustc", "javac", "java", "dotnet", "swift", "ruby", "php", "composer", "gradle", "mvn", "true", "false", "test",
   ],
 };
 

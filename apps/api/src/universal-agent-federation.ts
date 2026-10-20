@@ -47,7 +47,9 @@ export function materializeAgentEnvelopes(input: { taskId: string; tenantId: str
 }
 
 export async function recordFederationStart(plan: FederationPlan): Promise<void> {
-  await appendExecutionEvidence(plan.taskId, plan.tenantId, {
+  await appendExecutionEvidence({
+    taskId: plan.taskId,
+    tenantId: plan.tenantId,
     kind: "AGENT_ASSIGNED",
     actor: "SYSTEM",
     summary: `Agent federation initialized with ${plan.agents.length} specialist agents`,
@@ -56,7 +58,9 @@ export async function recordFederationStart(plan: FederationPlan): Promise<void>
 }
 
 export async function recordFederationWave(taskId: string, tenantId: string, wave: FederationWave, status: "STARTED" | "COMPLETED" | "BLOCKED", envelopes: AgentEnvelope[]): Promise<void> {
-  await appendExecutionEvidence(taskId, tenantId, {
+  await appendExecutionEvidence({
+    taskId,
+    tenantId,
     kind: status === "COMPLETED" ? "EXECUTION_FINISHED" : status === "BLOCKED" ? "TASK_FAILED" : "EXECUTION_STARTED",
     actor: "SYSTEM",
     summary: `Agent federation wave ${wave.wave} ${status.toLowerCase()}`,

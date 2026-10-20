@@ -14,6 +14,6 @@ describe("context coder pipeline", () => {
     const context = await buildCoderInputFromRepository({ client, repository: { owner: "o", name: "r" }, ref: "abcdef1", task: "fix login", tenantId: "t", userId: "u", maxFiles: 1, maxChunks: 1 });
     assert.equal(context.selectedPaths.length, 1);
     assert.equal(context.chunks.length, 1);
-    assert.equal(context.files[0].path, "src/login.ts");
+    assert.equal(context.files[0]?.path, "src/login.ts");
   });
 });

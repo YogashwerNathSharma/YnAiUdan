@@ -68,7 +68,7 @@ export async function registerCodeAgentRoutes(app: FastifyInstance): Promise<voi
     if (task.status !== "RUNNING") return reply.code(409).send({ error: "Task must be RUNNING before execution" });
     const next = task.steps.find(step => step.status === "PENDING");
     if (!next) return reply.send({ status: "complete", taskId: task.id });
-    if (next.stepNumber > task.maxSteps) return reply.code(409).send({ error: "Task step limit reached" });
+    if (next.stepNumber !== null && task.maxSteps !== null && next.stepNumber > task.maxSteps) return reply.code(409).send({ error: "Task step limit reached" });
     await db.taskStep.update({ where: { id: next.id }, data: { status: "RUNNING", startedAt: new Date() } });
     const updated = await db.taskStep.update({ where: { id: next.id }, data: { status: "COMPLETED", completedAt: new Date(), output: { note: "Step execution boundary is ready; concrete tool selection is required before side effects." } } });
     return reply.send({ taskId: task.id, step: updated, nextAction: "select_tool" });

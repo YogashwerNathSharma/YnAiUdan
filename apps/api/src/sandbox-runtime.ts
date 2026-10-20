@@ -43,14 +43,14 @@ function collectProcess(child: ReturnType<typeof spawn>, input: SandboxExecution
       child.kill("SIGKILL");
       finish({ exitCode: 124, stdout: stdout.slice(0, outputLimit), stderr: `${stderr.slice(0, outputLimit - 20)}\nExecution timed out.`, tenantId: input.tenantId, cwd: input.cwd, timedOut: true, isolated, backend: backendName, resourceLimit: "TIMEOUT" });
     }, input.timeoutMs);
-    child.stdout.on("data", data => {
+    child.stdout?.on("data", data => {
       stdout += data.toString();
       if (stdout.length > outputLimit) {
         outputExceeded = true;
         child.kill("SIGKILL");
       }
     });
-    child.stderr.on("data", data => {
+    child.stderr?.on("data", data => {
       stderr += data.toString();
       if (stderr.length > outputLimit) {
         outputExceeded = true;

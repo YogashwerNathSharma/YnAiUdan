@@ -24,7 +24,9 @@ test("universal agent federation builds dependency-ordered specialist waves", ()
 
 test("universal agent federation materializes bounded agent envelopes", () => {
   const federation = buildFederationPlan("task-1", "tenant-1", plan.intent.goal, plan);
-  const envelopes = materializeAgentEnvelopes({ taskId: "task-1", tenantId: "tenant-1", goal: plan.intent.goal, wave: federation.waves[0] });
+  const firstWave = federation.waves[0];
+  assert.ok(firstWave);
+  const envelopes = materializeAgentEnvelopes({ taskId: "task-1", tenantId: "tenant-1", goal: plan.intent.goal, wave: firstWave });
   assert.equal(envelopes.length, 1);
   assert.equal(envelopes[0]?.agent, "WEB_BUILDER");
   assert.equal(envelopes[0]?.status, "READY");

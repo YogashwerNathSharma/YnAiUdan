@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { db } from "./db.js";
 import { appendExecutionEvidence } from "./universal-execution-ledger.js";
 
@@ -39,7 +40,7 @@ export async function recordArtifact(input: ArtifactInput) {
       tool: input.tool,
       sourceStepId: input.sourceStepId,
       verificationStatus: input.verificationStatus ?? "UNVERIFIED",
-      provenance: input.provenance,
+      provenance: input.provenance as Prisma.InputJsonValue | undefined,
     },
     update: {
       name: input.name,
@@ -49,10 +50,12 @@ export async function recordArtifact(input: ArtifactInput) {
       tool: input.tool,
       sourceStepId: input.sourceStepId,
       verificationStatus: input.verificationStatus ?? "UNVERIFIED",
-      provenance: input.provenance,
+      provenance: input.provenance as Prisma.InputJsonValue | undefined,
     },
   });
-  await appendExecutionEvidence(input.taskId, input.tenantId, {
+  await appendExecutionEvidence({
+    taskId: input.taskId,
+    tenantId: input.tenantId,
     kind: "ARTIFACT_CREATED",
     actor: "AGENT",
     summary: `Artifact ${input.name} recorded with SHA-256 provenance`,

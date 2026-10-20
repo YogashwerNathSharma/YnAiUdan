@@ -1,7 +1,7 @@
 export type ImportGraphNode = { path: string; imports: string[]; dependents: string[] };
 
 const IMPORT_RE = /(?:import\s+(?:[^'";]+?\s+from\s+)?|export\s+(?:[^'";]+?\s+from\s+)?|require\s*\()(['"])([^'"]+)\1/g;
-function normalize(path: string): string { return path.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\.(?:ts|tsx|js|jsx|mjs|cjs)$/, ""); }
+function normalize(value: string): string { const parts: string[] = []; for (const part of value.replace(/\\/g, "/").split("/")) { if (!part || part === ".") continue; if (part === "..") parts.pop(); else parts.push(part); } return parts.join("/").replace(/\.(?:ts|tsx|js|jsx|mjs|cjs)$/, ""); }
 function resolveLocal(from: string, specifier: string, files: Set<string>): string | null {
   if (!specifier.startsWith(".")) return null;
   const base = from.split("/"); base.pop();
@@ -16,7 +16,9 @@ export function buildImportGraph(files: Array<{ path: string; content: string }>
   for (const file of files) {
     let match: RegExpExecArray | null;
     while ((match = IMPORT_RE.exec(file.content)) !== null) {
-      const resolved = resolveLocal(file.path, match[2], fileSet);
+      const specifier = match[2];
+      if (!specifier) continue;
+      const resolved = resolveLocal(file.path, specifier, fileSet);
       if (resolved && resolved !== file.path && !nodes.get(file.path)!.imports.includes(resolved)) nodes.get(file.path)!.imports.push(resolved);
     }
     IMPORT_RE.lastIndex = 0;

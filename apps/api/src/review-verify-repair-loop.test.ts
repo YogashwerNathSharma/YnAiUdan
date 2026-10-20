@@ -14,6 +14,6 @@ describe("review verify repair loop", () => {
     const workspace = createWorkspaceContext({ tenantId: "t", userId: "u", baseRef: "main", files: [{ path: "src/app.ts", content: "export const app = true;" }] });
     const result = await reviewVerifyRepairWorkspace({ workspace, role: "DEVELOPER", userId: "u", commands: ["false"], maxAttempts: 1, repair: async () => null });
     assert.equal(result.status, "FAILED");
-    assert.equal(result.verification[0].ok, false);
+    assert.equal(result.verification[0]?.ok, false);
   });
 });

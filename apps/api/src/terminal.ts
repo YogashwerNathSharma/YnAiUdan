@@ -31,8 +31,9 @@ function parseCommand(command: string): { executable: string; args: string[] } {
   validateSandboxCommand(command);
   if (blockedFragments.some(pattern => pattern.test(command))) throw new Error("Command contains a blocked operation");
   const parts = command.match(/(?:[^\s"]+|"[^"]*")+/g)?.map(part => part.replace(/^"|"$/g, "")) ?? [];
-  if (!parts.length || !allowedCommands.has(path.basename(parts[0]))) throw new Error("Command is not allowlisted");
-  return { executable: parts[0], args: parts.slice(1) };
+  const executable = parts[0];
+  if (!executable || !allowedCommands.has(path.basename(executable))) throw new Error("Command is not allowlisted");
+  return { executable, args: parts.slice(1) };
 }
 
 function isSafeArgument(arg: string): boolean {

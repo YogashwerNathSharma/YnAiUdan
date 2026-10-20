@@ -23,7 +23,7 @@ export async function reviewVerifyRepairWorkspace(params: {
 
   for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
     const review = reviewWorkspace(workspace, params.packageJson);
-    verification = await verifyCodeChange({ role: params.role, mode: params.mode, tenantId: workspace.tenantId, userId: params.userId, projectId: params.projectId, commands: params.commands });
+    verification = await verifyCodeChange({ role: params.role, mode: params.mode, tenantId: workspace.tenantId, userId: params.userId, projectId: params.projectId, commands: params.commands, files: workspace.files });
     if (review.approved && verificationPassed(verification)) return { status: attempt === 0 ? "APPROVED" : "FIXED", attempts: attempt, review, verification, diagnoses, workspace };
     if (attempt === maxAttempts) return { status: "FAILED", attempts: attempt, review, verification, diagnoses, workspace };
     const diagnosis = diagnoseFailure(JSON.stringify({ review, verification }));

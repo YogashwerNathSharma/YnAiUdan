@@ -5,7 +5,7 @@ import { indexRepositoryForTask } from "./github-tree-index.js";
 describe("github tree index", () => {
   it("selects source files from a repository tree", async () => {
     const client = { listTree: async () => [
-      { path: "src/login.ts", type: "file", content: "login authentication" },
+      { path: "src/login.ts", type: "file", content: "import './auth'; login authentication" },
       { path: "src/auth.ts", type: "file", content: "authentication" },
       { path: "README.md", type: "file", content: "login" }
     ] } as any;

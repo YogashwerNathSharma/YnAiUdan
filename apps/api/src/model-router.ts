@@ -24,7 +24,7 @@ export function routeProvider(model: string): AIProvider {
 }
 
 export function providerAvailable(model: string): boolean {
-  const provider = model.includes(":") ? model.split(":", 1)[0] : "openai";
+  const provider = model.includes(":") ? (model.split(":", 1)[0] ?? "") : "openai";
   return Boolean(providerRegistry.get(provider));
 }
 
