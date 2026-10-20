@@ -23,7 +23,7 @@ export async function recoverTask(taskId: string, userId: string, tenantId: stri
   }
   const claimed = await db.task.updateMany({ where: { id: task.id, userId, tenantId, status: { in: ["FAILED", "PAUSED"] } }, data: { status: "RUNNING" } });
   if (claimed.count !== 1) return { status: "RUNNING", recovered: false, reason: "RECOVERY_RACE_LOST" };
-  return { status: "RUNNING", recovered: true, checkpoint: task.steps.filter(step => step.status === "COMPLETED").map(step => step.sequence).sort((a, b) => b - a)[0] ?? 0, failureLessons, recommendedStrategies };
+  return { status: "RUNNING", recovered: true, checkpoint: task.steps.filter(step => step.status === "COMPLETED").map(step => step.sequence).filter((value): value is number => typeof value === "number").sort((a, b) => b - a)[0] ?? 0, failureLessons, recommendedStrategies };
 }
 
 export async function recordRecoveredSolution(input: { tenantId: string; userId: string; projectId?: string | null; goal: string; toolName: string; solution: string; verification: string }) { return promoteRecoveredSolution(input); }
