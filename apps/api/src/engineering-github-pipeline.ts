@@ -38,7 +38,7 @@ export async function runEngineeringToGitHub(params: {
 
   if (engineering.status !== "APPROVED" && engineering.status !== "FIXED") return { engineering };
 
-  const changes = engineering.workspace.changes.filter(change => change.status !== "deleted").map(change => ({ path: change.path, content: change.content }));
+  const changes = engineering.workspace.changes.filter(change => change.status !== "deleted").map(change => ({ path: change.path, content: change.content ?? "" }));
   if (!changes.length) return { engineering };
 
   const github = await executeGitHubEngineering({
