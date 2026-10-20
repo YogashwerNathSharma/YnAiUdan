@@ -19,7 +19,7 @@ export type CriticResult = {
   failedChecks: string[];
 };
 
-function artifactMatches(required: string, artifact: CriticInput["artifacts"][number]): boolean {
+function artifactMatches(required: string, artifact: NonNullable<CriticInput["artifacts"]>[number]): boolean {
   const value = `${artifact.path ?? ""} ${artifact.sha256 ?? ""}`.toLowerCase();
   return value.includes(required.toLowerCase());
 }
