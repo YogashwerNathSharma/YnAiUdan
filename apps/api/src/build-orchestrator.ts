@@ -1,6 +1,6 @@
 import type { ProductBuildPlan } from "./requirement-compiler.js";
 
-export type BuildWorkItem = { id: string; requirementId: string; capability: string; platform: string; dependsOn: string[]; status: "PENDING" | "READY" };
+export type BuildWorkItem = { id: string; projectId: string; requirementId: string; capability: string; platform: string; dependsOn: string[]; status: "PENDING" | "READY" };
 export type BuildOrchestrationPlan = { projectId: string; phase: "DISCOVERY" | "BUILD" | "VERIFY"; workItems: BuildWorkItem[]; blockers: string[] };
 
 export function createBuildOrchestrationPlan(plan: ProductBuildPlan): BuildOrchestrationPlan {
@@ -11,7 +11,7 @@ export function createBuildOrchestrationPlan(plan: ProductBuildPlan): BuildOrche
       for (const platform of requirement.platforms) {
         const id = `${requirement.id}:${platform}:${capability.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}`;
         const dependencies = workItems.filter(item => item.requirementId === requirement.id).map(item => item.id);
-        workItems.push({ id, requirementId: requirement.id, capability, platform, dependsOn: dependencies, status: blockers.length ? "PENDING" : "READY" });
+        workItems.push({ id, projectId: plan.projectId, requirementId: requirement.id, capability, platform, dependsOn: dependencies, status: blockers.length ? "PENDING" : "READY" });
       }
     }
   }
