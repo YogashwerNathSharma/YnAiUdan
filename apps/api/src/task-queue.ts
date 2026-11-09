@@ -16,12 +16,26 @@ class TaskQueue {
   activeWorkers(): number { return this.active; }
   async start(worker: (item: QueueJob) => Promise<void>): Promise<void> {
     if (this.running) return; this.running = true;
+    let consecutiveErrors = 0;
     while (this.running) {
-      if (this.active >= this.config.maxConcurrency) { await new Promise(resolve => setTimeout(resolve, this.config.pollIntervalMs)); continue; }
-      const item = await this.backend.dequeue();
-      if (!item) { await new Promise(resolve => setTimeout(resolve, this.config.pollIntervalMs)); continue; }
-      this.active += 1;
-      void worker(item).catch(() => undefined).finally(() => { this.active -= 1; });
+      try {
+        if (this.active >= this.config.maxConcurrency) { await new Promise(resolve => setTimeout(resolve, this.config.pollIntervalMs)); continue; }
+        const item = await this.backend.dequeue();
+        consecutiveErrors = 0;
+        if (!item) { await new Promise(resolve => setTimeout(resolve, this.config.pollIntervalMs)); continue; }
+        this.active += 1;
+        void worker(item).catch(() => undefined).finally(() => { this.active -= 1; });
+      } catch (error) {
+        consecutiveErrors += 1;
+        // Only log the first failure and then occasionally, so a missing/unreachable
+        // database does not flood the terminal with the same error forever.
+        if (consecutiveErrors === 1 || consecutiveErrors % 20 === 0) {
+          console.error(`Task queue poll failed (is the database reachable?) [x${consecutiveErrors}]:`, error instanceof Error ? error.message : error);
+        }
+        // Back off: grow the wait up to 30s while errors persist.
+        const backoff = Math.min(30_000, this.config.pollIntervalMs * Math.min(consecutiveErrors, 30));
+        await new Promise(resolve => setTimeout(resolve, backoff));
+      }
     }
   }
   stop(): void { this.running = false; }

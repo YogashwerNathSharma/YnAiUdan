@@ -3,17 +3,18 @@ import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "./db.js";
+import { devAuthStore, isDbDisabled } from "./dev-auth-store.js";
 
 const registerSchema = z.object({
   tenantName: z.string().trim().min(2).max(100),
   name: z.string().trim().min(2).max(100),
   email: z.string().trim().email().max(320),
-  password: z.string().min(12).max(128)
+  password: z.string().min(12).max(200)
 });
 
 const loginSchema = z.object({
   email: z.string().trim().email().max(320),
-  password: z.string().min(1).max(128)
+  password: z.string().min(1).max(200)
 });
 
 type AuthPayload = { sub: string; tenantId: string; role: string };
@@ -22,6 +23,15 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/v1/auth/register", async (request, reply) => {
     const input = registerSchema.parse(request.body);
     const email = input.email.toLowerCase();
+
+    // ---- DB-free dev mode ----
+    if (isDbDisabled()) {
+      if (devAuthStore.findByEmail(email)) return reply.code(409).send({ error: "Email already registered" });
+      const passwordHash = await bcrypt.hash(input.password, 12);
+      const user = devAuthStore.create({ email, displayName: input.name, passwordHash, role: "OWNER" });
+      const token = await reply.jwtSign({ sub: user.id, tenantId: user.tenantId, role: user.role });
+      return reply.code(201).send({ user: { id: user.id, tenantId: user.tenantId, email: user.email, displayName: user.displayName, role: user.role }, token });
+    }
 
     const existing = await db.user.findUnique({ where: { email } });
     if (existing) return reply.code(409).send({ error: "Email already registered" });
@@ -50,8 +60,23 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/api/v1/auth/login", async (request, reply) => {
     const input = loginSchema.parse(request.body);
-    const user = await db.user.findUnique({ where: { email: input.email.toLowerCase() } });
+    const email = input.email.toLowerCase();
 
+    // ---- DB-free dev mode ----
+    if (isDbDisabled()) {
+      let user = devAuthStore.findByEmail(email);
+      // First login in dev mode auto-creates the account so you are never locked out.
+      if (!user) {
+        const passwordHash = await bcrypt.hash(input.password, 12);
+        user = devAuthStore.create({ email, displayName: email.split("@")[0] || "User", passwordHash, role: "OWNER" });
+      } else if (!(await bcrypt.compare(input.password, user.passwordHash))) {
+        return reply.code(401).send({ error: "Invalid email or password" });
+      }
+      const token = await reply.jwtSign({ sub: user.id, tenantId: user.tenantId, role: user.role });
+      return reply.send({ user: { id: user.id, tenantId: user.tenantId, email: user.email, displayName: user.displayName, role: user.role }, token });
+    }
+
+    const user = await db.user.findUnique({ where: { email } });
     if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) {
       return reply.code(401).send({ error: "Invalid email or password" });
     }
@@ -65,6 +90,14 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/api/v1/auth/me", { preHandler: authenticate }, async (request, reply) => {
     const auth = request.user as AuthPayload;
+
+    // ---- DB-free dev mode ----
+    if (isDbDisabled()) {
+      const user = devAuthStore.findById(auth.sub);
+      if (!user) return reply.code(401).send({ error: "Unauthorized" });
+      return reply.send({ user: { id: user.id, tenantId: user.tenantId, email: user.email, displayName: user.displayName, role: user.role } });
+    }
+
     const user = await db.user.findUnique({
       where: { id: auth.sub },
       select: { id: true, tenantId: true, email: true, displayName: true, role: true }

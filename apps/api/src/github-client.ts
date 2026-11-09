@@ -24,4 +24,9 @@ export class GitHubHttpClient implements GitHubClient {
   }
   async createPullRequest(repo: GitHubRepository, title: string, head: string, base: string, body?: string): Promise<unknown> { return (await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/pulls`, { method: "POST", body: JSON.stringify({ title, head, base, body: body ?? "Created by YnAiUdan with explicit approval." }) })).data; }
   async getCommitStatus(repo: GitHubRepository, sha: string): Promise<unknown> { return (await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/commits/${encodeURIComponent(sha)}/status`)).data; }
+  async getTree(repo: GitHubRepository, ref?: string): Promise<unknown> {
+    const branch = ref ?? repo.defaultBranch ?? "main";
+    const data = (await this.request(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/git/trees/${encodeURIComponent(branch)}?recursive=1`)).data as { tree?: Array<{ path: string; type: string }> };
+    return (data?.tree ?? []).filter(t => t.type === "blob").map(t => t.path).slice(0, 2000);
+  }
 }

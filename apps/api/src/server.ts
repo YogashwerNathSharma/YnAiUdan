@@ -1,3 +1,4 @@
+import "./load-env.js";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
@@ -7,6 +8,7 @@ import { registerProjectRoutes } from "./projects.js";
 import { registerConversationRoutes } from "./conversations.js";
 import { registerChatRoutes } from "./chat.js";
 import { registerChatStreamRoutes } from "./chat-stream.js";
+import { registerImageGenRoutes } from "./image-gen.js";
 import { registerAgentRoutes } from "./agent.js";
 import { registerPermissionRoutes } from "./permissions.js";
 import { registerWorkspaceRoutes } from "./workspace.js";
@@ -14,6 +16,7 @@ import { registerMemoryRoutes } from "./memory.js";
 import { registerLearningRoutes } from "./learning-routes.js";
 import { registerCodingRoutes, registerCodingTools } from "./coding.js";
 import { registerCodeAgentRoutes } from "./code-agent.js";
+import { registerCodeFixAgentRoutes } from "./code-fix-agent.js";
 import { registerTerminalTool } from "./terminal.js";
 import { registerGitHubAgentRoutes, githubRegistry } from "./github-agent.js";
 import { registerGitHubWriteRoutes } from "./github-write.js";
@@ -42,7 +45,7 @@ import { taskQueue } from "./task-queue.js";
 import { processTaskQueueItem } from "./task-worker.js";
 import { startQueueRecovery, stopQueueRecovery } from "./queue-recovery.js";
 
-const app = Fastify({ logger: true });
+const app = Fastify({ logger: true, bodyLimit: 26_214_400 }); // 25MB for image (data URL) uploads in chat
 await app.register(helmet);
 await app.register(cors, { origin: process.env.CORS_ORIGIN ?? "http://localhost:5173", credentials: true });
 const jwtSecret = process.env.JWT_SECRET;
@@ -56,9 +59,18 @@ app.get("/health/readiness", async (_request, reply) => { try { await db.$runCom
 app.get("/api/v1", async () => ({ name: "YnAiUdan API", version: "v1", capability: "universal" }));
 app.get("/api/v1/tools", async () => toolRegistry.list());
 app.get("/api/v1/models", async () => modelRouterInfo());
-app.get("/api/v1/metrics", async () => runtimeMetrics());
-app.get("/api/v1/provider-health", async () => providerHealthSnapshot());
-await registerAuthRoutes(app); await registerProjectRoutes(app); await registerConversationRoutes(app); await registerMemoryRoutes(app); await registerLearningRoutes(app); await registerChatRoutes(app); await registerChatStreamRoutes(app); await registerAgentRoutes(app); await registerPermissionRoutes(app); await registerWorkspaceRoutes(app); await registerCodingRoutes(app); await registerCodeAgentRoutes(app); await registerGitHubAgentRoutes(app); await registerGitHubWriteRoutes(app); await registerGitHubActionRoutes(app); await registerGitHubCodingAgentRoutes(app); await registerGitHubExecutionRoutes(app); await registerResearchRoutes(app); await registerContextRoutes(app); await registerCiFailureRoutes(app); await registerCiRepairRoutes(app); await registerRepairExecutionRoutes(app); await registerBuildPlanRoutes(app); await registerUniversalRoutes(app); await registerUniversalCodingRoutes(app); await registerUniversalOrchestratorRoutes(app); await registerUniversalEnterpriseRoutes(app); await registerUniversalAgentRoutes(app);
+await registerAuthRoutes(app); await registerProjectRoutes(app); await registerConversationRoutes(app); await registerChatRoutes(app); await registerChatStreamRoutes(app); await registerImageGenRoutes(app); await registerAgentRoutes(app); await registerPermissionRoutes(app); await registerWorkspaceRoutes(app); await registerMemoryRoutes(app); await registerLearningRoutes(app); await registerCodingRoutes(app); await registerCodeAgentRoutes(app); await registerCodeFixAgentRoutes(app); await registerGitHubAgentRoutes(app); await registerGitHubWriteRoutes(app); await registerGitHubActionRoutes(app); await registerGitHubCodingAgentRoutes(app); await registerGitHubExecutionRoutes(app); await registerResearchRoutes(app); await registerContextRoutes(app); await registerCiFailureRoutes(app); await registerCiRepairRoutes(app); await registerRepairExecutionRoutes(app); await registerBuildPlanRoutes(app); await registerUniversalRoutes(app); await registerUniversalCodingRoutes(app); await registerUniversalOrchestratorRoutes(app); await registerUniversalEnterpriseRoutes(app); await registerUniversalAgentRoutes(app);
 startQueueRecovery();
 void taskQueue.start(processTaskQueueItem);
-const shutdown = async () => { stopQueueRecovery(); taskQueue.stop(); await db.$disconnect(); await app.close(); };
+const shutdown = async () => { stopQueueRecovery(); taskQueue.stop(); await db.$disconnect(); await app.close(); process.exit(0); };
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
+const port = Number(process.env.PORT ?? 4000);
+const host = process.env.HOST ?? "0.0.0.0";
+try {
+  await app.listen({ port, host });
+} catch (err) {
+  app.log.error(err);
+  process.exit(1);
+}

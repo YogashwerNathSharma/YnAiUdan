@@ -5,6 +5,12 @@ coverage/
 .env
 .env.*
 !.env.example
+# Backup/copy env files (contain real secrets — never commit)
+.env copy
+*.env
+env.backup
 .vite/
 .DS_Store
 *.log
+# Local diagnostic scripts
+test-gemini.mjs

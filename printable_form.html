@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<title>प्रिंटेबल फॉर्म</title>
+<style>
+  body{font-family:Arial, sans-serif;margin:0;padding:10px;}
+  form{max-width:600px;margin:auto;}
+  label{display:block;margin:5px 0 2px;font-weight:bold;}
+  input,select{width:100%;padding:4px;margin-bottom:8px;border:1px solid #ccc;border-radius:3px;}
+  .btn{background:#4CAF50;color:white;border:none;padding:6px 12px;cursor:pointer;border-radius:3px;}
+  @media print{.no-print{display:none;}}
+</style>
+</head>
+<body>
+<h2>संपर्क फ़ॉर्म</h2>
+<form onsubmit="return false;">
+  <label for="name">नाम</label>
+  <input type="text" id="name" name="name" placeholder="अपना नाम लिखें">
+
+  <label for="email">ईमेल</label>
+  <input type="email" id="email" name="email" placeholder="example@domain.com">
+
+  <label for="phone">फ़ोन नंबर</label>
+  <input type="tel" id="phone" name="phone" placeholder="9876543210">
+
+  <label for="subject">विषय</label>
+  <select id="subject" name="subject">
+    <option value="सामान्य">सामान्य</option>
+    <option value="तकनीकी सहायता">तकनीकी सहायता</option>
+    <option value="प्रतिक्रिया">प्रतिक्रिया</option>
+  </select>
+
+  <label for="message">संदेश</label>
+  <textarea id="message" name="message" rows="4" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:3px;"></textarea>
+
+  <button type="button" class="btn no-print" onclick="window.print()">प्रिंट करें</button>
+</form>
+</body>
+</html>

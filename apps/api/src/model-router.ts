@@ -5,12 +5,12 @@ export type ModelTask = "chat" | "reasoning" | "coding" | "image" | "video" | "d
 const configured = (key: string): string | undefined => process.env[key]?.trim() || undefined;
 
 const defaults: Record<ModelTask, string> = {
-  chat: process.env.AI_DEFAULT_MODEL ?? "openai:gpt-5-mini",
-  reasoning: process.env.AI_REASONING_MODEL ?? "openai:gpt-5",
-  coding: process.env.AI_CODING_MODEL ?? "openai:gpt-5",
+  chat: process.env.AI_DEFAULT_MODEL ?? "openai:gpt-4o-mini",
+  reasoning: process.env.AI_REASONING_MODEL ?? "openai:gpt-4o",
+  coding: process.env.AI_CODING_MODEL ?? "openai:gpt-4o",
   image: process.env.AI_IMAGE_MODEL ?? "image:default",
   video: process.env.AI_VIDEO_MODEL ?? "video:default",
-  document: process.env.AI_DOCUMENT_MODEL ?? "openai:gpt-5-mini",
+  document: process.env.AI_DOCUMENT_MODEL ?? "openai:gpt-4o-mini",
   embedding: process.env.AI_EMBEDDING_MODEL ?? "embedding:default",
   speech: process.env.AI_SPEECH_MODEL ?? "speech:default"
 };

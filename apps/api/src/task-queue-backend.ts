@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { MongoTaskQueueBackend } from "./task-queue-persistence.js";
+import { isDbDisabled } from "./dev-auth-store.js";
 
 export type QueueJob = { id: string; taskId: string; createdAt: number; attempts: number };
 
@@ -22,5 +23,15 @@ export class MemoryQueueBackend implements TaskQueueBackend {
 }
 
 export function createQueueBackend(): TaskQueueBackend {
-  return process.env.QUEUE_BACKEND === "memory" ? new MemoryQueueBackend() : new MongoTaskQueueBackend();
+  // Explicit override wins.
+  if (process.env.QUEUE_BACKEND === "memory") return new MemoryQueueBackend();
+  if (process.env.QUEUE_BACKEND === "mongo") return new MongoTaskQueueBackend();
+  // Auto: without a DATABASE_URL, Mongo cannot work and every poll would spam
+  // the console with validation errors — fall back to the in-memory queue so
+  // the dev server runs cleanly.
+  if (isDbDisabled()) {
+    console.warn("[task-queue] No usable DATABASE_URL (missing or without credentials) — using in-memory queue backend. Set a full MongoDB URL with credentials to enable the MongoDB-backed queue.");
+    return new MemoryQueueBackend();
+  }
+  return new MongoTaskQueueBackend();
 }
